@@ -1,0 +1,10 @@
+{
+  "projectId": "veloura-quest",
+  "appId": "1:1015798130353:web:69d37e060ca28822faa490",
+  "apiKey": "AIzaSyC_t0fUsygLAb1uMbiovJYUgApyko2ciUQ",
+  "authDomain": "veloura-quest.firebaseapp.com",
+  "firestoreDatabaseId": "(default)",
+  "storageBucket": "veloura-quest.firebasestorage.app",
+  "messagingSenderId": "1015798130353",
+  "measurementId": "G-C0E3F0BQ48"
+}

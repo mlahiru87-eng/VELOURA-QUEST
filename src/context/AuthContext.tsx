@@ -164,6 +164,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       if (path === '/complete' || search.includes('taskId=') || search.includes('sessionId=')) {
         return 'complete';
       }
+      if (path === '/ref' || path === '/register' || search.includes('code=') || search.includes('ref=')) {
+        return 'register';
+      }
     }
     return 'splash';
   };
@@ -226,7 +229,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           const reward = typeof raw.reward === 'number' ? raw.reward : (typeof raw.rewardAmount === 'number' ? raw.rewardAmount : 5.0);
           const duration = typeof raw.duration === 'number' ? raw.duration : (typeof raw.durationSeconds === 'number' ? raw.durationSeconds : 30);
           const thumbnailUrl = raw.thumbnailUrl || raw.thumbnail || 'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?w=500&auto=format&fit=crop&q=80';
-          const videoUrl = raw.videoUrl || 'https://veloura.com/watch/video123';
+          const videoUrl = raw.videoUrl || 'https://veloura-etez.vercel.app/video/Lwq20xe9n2eLnBbQqzjC';
           const createdAt = raw.createdAt || new Date().toISOString();
 
           loadedTasks.push({
@@ -906,7 +909,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
     try {
       // 1. Read the task's videoUrl from Firestore
-      let videoUrl = 'https://veloura.com/watch/video123';
+      let videoUrl = 'https://veloura-etez.vercel.app/video/Lwq20xe9n2eLnBbQqzjC';
       try {
         telemetry.recordFirestoreRead();
         const taskRef = doc(db, 'tasks', taskId);
@@ -994,7 +997,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         description: taskData.description,
         reward,
         thumbnailUrl,
-        videoUrl: (taskData as any).videoUrl || 'https://veloura.com/watch/video123',
+        videoUrl: (taskData as any).videoUrl || 'https://veloura-etez.vercel.app/video/Lwq20xe9n2eLnBbQqzjC',
         duration,
         category: taskData.category,
         createdAt,

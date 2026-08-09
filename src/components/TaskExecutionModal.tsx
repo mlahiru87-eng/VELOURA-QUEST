@@ -89,9 +89,6 @@ export const TaskExecutionModal: React.FC<TaskExecutionModalProps> = ({ task, on
           </div>
         </div>
 
-        {/* Description */}
-        <p className="text-xs text-slate-300 leading-relaxed">{task.description}</p>
-
         {/* Execution Timer & Action Section */}
         <div className="space-y-4 pt-2 border-t border-slate-800/80">
           {!isAlreadyCompleted && (

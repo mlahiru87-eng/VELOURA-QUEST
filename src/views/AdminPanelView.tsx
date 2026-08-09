@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { useToast } from '../context/ToastContext';
 import { TaskItem, UserProfile, SystemSettings } from '../types';
@@ -6,6 +6,8 @@ import { AnalyticsDashboard } from '../components/AnalyticsDashboard';
 import { UserTimelineModal } from '../components/UserTimelineModal';
 import { WalletAdjustmentModal } from '../components/WalletAdjustmentModal';
 import { exportUsersCSV, exportWithdrawalsCSV, exportTransactionsCSV } from '../lib/securityAndUtils';
+import { doc, getDoc } from 'firebase/firestore';
+import { db } from '../lib/firebase';
 import { 
   ShieldAlert, 
   Users, 
@@ -25,7 +27,8 @@ import {
   Clock,
   Flag,
   ShieldCheck,
-  FileText
+  FileText,
+  Sparkles
 } from 'lucide-react';
 
 export const AdminPanelView: React.FC = () => {
@@ -63,13 +66,137 @@ export const AdminPanelView: React.FC = () => {
   const [adjustmentUser, setAdjustmentUser] = useState<UserProfile | null>(null);
 
   // New task form state
-  const [taskTitle, setTaskTitle] = useState('');
-  const [taskDescription, setTaskDescription] = useState('');
-  const [taskDuration, setTaskDuration] = useState('30');
-  const [taskReward, setTaskReward] = useState('5.00');
-  const [taskCategory, setTaskCategory] = useState<'Video' | 'Survey' | 'Game Quest' | 'App Install' | 'Special'>('Video');
-  const [taskThumbnail, setTaskThumbnail] = useState('https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?w=500&auto=format&fit=crop&q=80');
   const [taskVideoUrl, setTaskVideoUrl] = useState('');
+  const [taskCategory, setTaskCategory] = useState<'Video' | 'Survey' | 'Game Quest' | 'App Install' | 'Special'>('Video');
+  const [taskReward, setTaskReward] = useState('5.00');
+
+  // Auto-detected metadata state (editable by admin if needed)
+  const [taskTitle, setTaskTitle] = useState('');
+  const [taskThumbnail, setTaskThumbnail] = useState('');
+  const [taskDuration, setTaskDuration] = useState('30');
+  const [isDetecting, setIsDetecting] = useState<boolean>(false);
+
+  // Auto detect video metadata when URL changes
+  const autoDetectMetadata = async (url: string) => {
+    setIsDetecting(true);
+
+    let detectedTitle = '';
+    let detectedThumb = '';
+    let detectedDuration = '30';
+
+    // 1. Extract video ID if present (e.g. /video/ID or /watch/ID or ?v=ID)
+    let videoId = '';
+    const videoMatch = url.match(/\/(?:video|watch|v)\/([a-zA-Z0-9_-]+)/i);
+    if (videoMatch) {
+      videoId = videoMatch[1];
+    } else {
+      try {
+        const urlObj = new URL(url, 'https://veloura-quest.vercel.app');
+        videoId = urlObj.searchParams.get('v') || urlObj.searchParams.get('id') || '';
+      } catch {
+        // ignore
+      }
+    }
+
+    // 2. Check Firestore if a document exists in 'videos' or 'tasks' for videoId
+    if (videoId) {
+      try {
+        const vSnap = await getDoc(doc(db, 'videos', videoId));
+        if (vSnap.exists()) {
+          const data = vSnap.data();
+          if (data.title) detectedTitle = data.title;
+          if (data.thumbnailUrl || data.thumbnail) detectedThumb = data.thumbnailUrl || data.thumbnail;
+          if (data.duration || data.durationSeconds) detectedDuration = String(data.duration || data.durationSeconds);
+        }
+      } catch (e) {
+        // ignore
+      }
+    }
+
+    // 3. Try fetching page HTML metadata
+    if (!detectedTitle || !detectedThumb) {
+      try {
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 2000);
+        const res = await fetch(url, { signal: controller.signal });
+        clearTimeout(timeoutId);
+
+        if (res.ok) {
+          const html = await res.text();
+          const parser = new DOMParser();
+          const docHtml = parser.parseFromString(html, 'text/html');
+
+          const ogTitle = docHtml.querySelector('meta[property="og:title"]')?.getAttribute('content') ||
+                          docHtml.querySelector('meta[name="twitter:title"]')?.getAttribute('content') ||
+                          docHtml.querySelector('title')?.textContent;
+          if (ogTitle && ogTitle.trim()) {
+            detectedTitle = ogTitle.replace(/\s*[-|–]\s*Veloura.*$/i, '').trim();
+          }
+
+          const ogImage = docHtml.querySelector('meta[property="og:image"]')?.getAttribute('content') ||
+                          docHtml.querySelector('meta[name="twitter:image"]')?.getAttribute('content');
+          if (ogImage && ogImage.trim()) {
+            detectedThumb = ogImage.trim();
+          }
+
+          const ogDuration = docHtml.querySelector('meta[property="video:duration"]')?.getAttribute('content') ||
+                             docHtml.querySelector('meta[property="og:video:duration"]')?.getAttribute('content');
+          if (ogDuration && !isNaN(parseInt(ogDuration))) {
+            detectedDuration = String(parseInt(ogDuration));
+          }
+        }
+      } catch (e) {
+        // CORS or network error, fallback handled below
+      }
+    }
+
+    // 4. Fallbacks if fetching / Firestore didn't yield values
+    if (!detectedTitle) {
+      if (videoId) {
+        const shortId = videoId.length > 12 ? videoId.slice(0, 8) + '...' : videoId;
+        detectedTitle = `Veloura Video Quest (${shortId})`;
+      } else {
+        detectedTitle = 'Veloura Daily Quest Video';
+      }
+    }
+
+    if (!detectedThumb) {
+      const thumbnails = [
+        'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?w=500&auto=format&fit=crop&q=80',
+        'https://images.unsplash.com/photo-1550745165-9bc0b252726f?w=500&auto=format&fit=crop&q=80',
+        'https://images.unsplash.com/photo-1542751371-adc38448a05e?w=500&auto=format&fit=crop&q=80',
+        'https://images.unsplash.com/photo-1511512578047-dfb367046420?w=500&auto=format&fit=crop&q=80'
+      ];
+      let hash = 0;
+      const str = videoId || url;
+      for (let i = 0; i < str.length; i++) {
+        hash = (hash << 5) - hash + str.charCodeAt(i);
+        hash |= 0;
+      }
+      detectedThumb = thumbnails[Math.abs(hash) % thumbnails.length];
+    }
+
+    setTaskTitle(detectedTitle);
+    setTaskThumbnail(detectedThumb);
+    setTaskDuration(detectedDuration);
+    setIsDetecting(false);
+  };
+
+  useEffect(() => {
+    if (!taskVideoUrl.trim()) {
+      setTaskTitle('');
+      setTaskThumbnail('');
+      setTaskDuration('30');
+      setIsDetecting(false);
+      return;
+    }
+
+    const timer = setTimeout(() => {
+      autoDetectMetadata(taskVideoUrl.trim());
+    }, 400);
+
+    return () => clearTimeout(timer);
+  }, [taskVideoUrl]);
 
   // Announcement state
   const [notifTitle, setNotifTitle] = useState('');
@@ -123,22 +250,36 @@ export const AdminPanelView: React.FC = () => {
 
   const handleAddTask = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!taskTitle.trim() || !taskVideoUrl.trim()) return;
+    if (!taskVideoUrl.trim()) {
+      showToast("Error", "Please enter a valid Video URL.", "error");
+      return;
+    }
+
+    const finalTitle = taskTitle.trim() || 'Veloura Daily Quest';
+    const finalReward = parseFloat(taskReward) || 5.00;
+    const finalDuration = parseInt(taskDuration) || 30;
+    const finalThumb = taskThumbnail.trim() || 'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?w=500&auto=format&fit=crop&q=80';
+
     await addNewTask({
-      title: taskTitle.trim(),
-      description: taskDescription.trim() || 'Complete quest objectives to claim reward.',
-      reward: parseFloat(taskReward) || 5.00,
-      thumbnailUrl: taskThumbnail.trim() || 'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?w=500&auto=format&fit=crop&q=80',
+      title: finalTitle,
+      description: 'Veloura Quest',
+      reward: finalReward,
+      rewardAmount: finalReward,
+      thumbnailUrl: finalThumb,
+      thumbnail: finalThumb,
       videoUrl: taskVideoUrl.trim(),
-      duration: parseInt(taskDuration) || 30,
+      duration: finalDuration,
+      durationSeconds: finalDuration,
       category: taskCategory,
       createdAt: new Date().toISOString(),
       active: true,
     });
-    showToast("Task Added", `Created daily quest "${taskTitle.trim()}".`, "success");
-    setTaskTitle('');
-    setTaskDescription('');
+
+    showToast("Task Published", `Created quest "${finalTitle}".`, "success");
     setTaskVideoUrl('');
+    setTaskTitle('');
+    setTaskThumbnail('');
+    setTaskDuration('30');
   };
 
   const handleSendNotif = async (e: React.FormEvent) => {
@@ -395,103 +536,145 @@ export const AdminPanelView: React.FC = () => {
       {adminTab === 'tasks' && (
         <div className="space-y-6">
           {/* Add New Task Form */}
-          <div className="glass-panel p-6 rounded-3xl border border-slate-800 space-y-4">
-            <h3 className="text-sm font-bold text-slate-100 flex items-center gap-2">
-              <Plus className="w-4 h-4 text-purple-400" /> Create New Daily Quest
-            </h3>
+          <div className="glass-panel p-6 sm:p-8 rounded-3xl border border-slate-800 space-y-6">
+            <div>
+              <h3 className="text-sm font-bold text-slate-100 flex items-center gap-2">
+                <Plus className="w-4 h-4 text-purple-400" /> Create New Daily Quest
+              </h3>
+              <p className="text-xs text-slate-400 mt-1">
+                Provide the video URL, category, and reward. Title, thumbnail, and duration will be auto-detected.
+              </p>
+            </div>
 
-            <form onSubmit={handleAddTask} className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-              <div>
-                <label className="block text-[11px] font-bold uppercase text-slate-400 mb-1">Quest Title *</label>
-                <input
-                  type="text"
-                  required
-                  placeholder="e.g. Watch Tech Video Review"
-                  value={taskTitle}
-                  onChange={(e) => setTaskTitle(e.target.value)}
-                  className="w-full glass-input rounded-xl px-3.5 py-2.5 text-xs text-slate-100"
-                />
+            <form onSubmit={handleAddTask} className="space-y-6">
+              <div className="space-y-4">
+                {/* 1. Video URL */}
+                <div>
+                  <label className="block text-[11px] font-bold uppercase tracking-wider text-slate-400 mb-1.5">
+                    Video URL *
+                  </label>
+                  <input
+                    type="url"
+                    required
+                    placeholder="https://veloura-etez.vercel.app/video/Lwq20xe9n2eLnBbQqzjC"
+                    value={taskVideoUrl}
+                    onChange={(e) => setTaskVideoUrl(e.target.value)}
+                    className="w-full glass-input rounded-xl px-4 py-3 text-xs text-slate-100 font-mono focus:border-purple-500 transition-colors"
+                  />
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  {/* 2. Category */}
+                  <div>
+                    <label className="block text-[11px] font-bold uppercase tracking-wider text-slate-400 mb-1.5">
+                      Category ▼
+                    </label>
+                    <select
+                      value={taskCategory}
+                      onChange={(e) => setTaskCategory(e.target.value as any)}
+                      className="w-full glass-input rounded-xl px-4 py-3 text-xs text-slate-100 bg-slate-900/90 border-slate-800 focus:border-purple-500 transition-colors cursor-pointer"
+                    >
+                      <option value="Video">Video</option>
+                      <option value="Survey">Survey</option>
+                      <option value="Game Quest">Game Quest</option>
+                      <option value="App Install">App Install</option>
+                      <option value="Special">Special</option>
+                    </select>
+                  </div>
+
+                  {/* 3. Reward */}
+                  <div>
+                    <label className="block text-[11px] font-bold uppercase tracking-wider text-slate-400 mb-1.5">
+                      Reward ($) *
+                    </label>
+                    <input
+                      type="number"
+                      step="0.01"
+                      min="0.50"
+                      required
+                      value={taskReward}
+                      onChange={(e) => setTaskReward(e.target.value)}
+                      className="w-full glass-input rounded-xl px-4 py-3 text-xs text-slate-100 font-mono font-bold focus:border-purple-500 transition-colors"
+                    />
+                  </div>
+                </div>
               </div>
 
-              <div>
-                <label className="block text-[11px] font-bold uppercase text-slate-400 mb-1">Category</label>
-                <select
-                  value={taskCategory}
-                  onChange={(e) => setTaskCategory(e.target.value as any)}
-                  className="w-full glass-input rounded-xl px-3.5 py-2.5 text-xs text-slate-100 bg-slate-900 border-slate-800"
-                >
-                  <option value="Video">Video</option>
-                  <option value="Survey">Survey</option>
-                  <option value="Game Quest">Game Quest</option>
-                  <option value="App Install">App Install</option>
-                  <option value="Special">Special</option>
-                </select>
-              </div>
+              {/* Video Preview Section */}
+              {taskVideoUrl.trim() && (
+                <div className="p-5 rounded-2xl bg-slate-900/90 border border-purple-500/30 space-y-4 transition-all">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-bold text-purple-300 flex items-center gap-1.5">
+                      <Sparkles className="w-4 h-4 text-purple-400" /> Video Preview
+                    </span>
+                    {isDetecting ? (
+                      <span className="text-[10px] text-amber-400 animate-pulse font-mono font-bold">
+                        Auto-detecting video metadata...
+                      </span>
+                    ) : (
+                      <span className="text-[10px] text-emerald-400 font-mono font-bold">
+                        ✓ Auto-detected
+                      </span>
+                    )}
+                  </div>
 
-              <div>
-                <label className="block text-[11px] font-bold uppercase text-slate-400 mb-1">Reward Amount ($)</label>
-                <input
-                  type="number"
-                  step="0.01"
-                  min="0.50"
-                  required
-                  value={taskReward}
-                  onChange={(e) => setTaskReward(e.target.value)}
-                  className="w-full glass-input rounded-xl px-3.5 py-2.5 text-xs text-slate-100 font-mono font-bold"
-                />
-              </div>
+                  <div className="flex flex-col md:flex-row gap-5 items-start">
+                    {/* Thumbnail */}
+                    <div className="w-full md:w-48 h-28 rounded-xl overflow-hidden bg-slate-950 border border-slate-700 shrink-0 relative shadow-md">
+                      {taskThumbnail ? (
+                        <img src={taskThumbnail} alt="Thumbnail Preview" className="w-full h-full object-cover" />
+                      ) : (
+                        <div className="w-full h-full flex items-center justify-center text-slate-600 text-xs">Thumbnail: Auto detecting...</div>
+                      )}
+                    </div>
 
-              <div>
-                <label className="block text-[11px] font-bold uppercase text-slate-400 mb-1">Duration (Seconds)</label>
-                <input
-                  type="number"
-                  min="5"
-                  required
-                  value={taskDuration}
-                  onChange={(e) => setTaskDuration(e.target.value)}
-                  className="w-full glass-input rounded-xl px-3.5 py-2.5 text-xs text-slate-100 font-mono"
-                />
-              </div>
+                    {/* Auto Detected Fields */}
+                    <div className="flex-1 space-y-3 w-full">
+                      <div>
+                        <label className="block text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1">
+                          Title (Auto detected - editable)
+                        </label>
+                        <input
+                          type="text"
+                          value={taskTitle}
+                          onChange={(e) => setTaskTitle(e.target.value)}
+                          placeholder="Auto detecting title..."
+                          className="w-full glass-input rounded-xl px-3.5 py-2 text-xs font-bold text-slate-100 border border-slate-700/80 focus:border-purple-500"
+                        />
+                      </div>
 
-              <div className="sm:col-span-2">
-                <label className="block text-[11px] font-bold uppercase text-slate-400 mb-1">Thumbnail Image URL</label>
-                <input
-                  type="url"
-                  value={taskThumbnail}
-                  onChange={(e) => setTaskThumbnail(e.target.value)}
-                  className="w-full glass-input rounded-xl px-3.5 py-2.5 text-xs text-slate-100 font-mono"
-                />
-              </div>
+                      <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 text-[10px]">
+                        <div className="p-2 rounded-lg bg-slate-950/60 border border-slate-800">
+                          <span className="text-slate-500 block uppercase font-bold text-[9px]">Thumbnail</span>
+                          <span className="text-slate-300 font-mono font-medium truncate block">Auto detected</span>
+                        </div>
+                        <div className="p-2 rounded-lg bg-slate-950/60 border border-slate-800">
+                          <span className="text-slate-500 block uppercase font-bold text-[9px]">Duration</span>
+                          <span className="text-blue-400 font-mono font-bold block">{taskDuration} Seconds</span>
+                        </div>
+                        <div className="p-2 rounded-lg bg-slate-950/60 border border-slate-800 col-span-2 sm:col-span-1">
+                          <span className="text-slate-500 block uppercase font-bold text-[9px]">Reward</span>
+                          <span className="text-emerald-400 font-mono font-bold block">${(parseFloat(taskReward) || 0).toFixed(2)}</span>
+                        </div>
+                      </div>
 
-              <div className="sm:col-span-2 lg:col-span-3">
-                <label className="block text-[11px] font-bold uppercase text-slate-400 mb-1">Video URL (Required External Target) *</label>
-                <input
-                  type="url"
-                  required
-                  placeholder="https://veloura.com/watch/video123"
-                  value={taskVideoUrl}
-                  onChange={(e) => setTaskVideoUrl(e.target.value)}
-                  className="w-full glass-input rounded-xl px-3.5 py-2.5 text-xs text-slate-100 font-mono"
-                />
-              </div>
+                      <div className="text-[10px] font-mono text-slate-400 truncate">
+                        <span className="text-slate-500 font-bold uppercase">Target: </span>
+                        {taskVideoUrl}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
 
-              <div className="sm:col-span-2 lg:col-span-3">
-                <label className="block text-[11px] font-bold uppercase text-slate-400 mb-1">Description</label>
-                <input
-                  type="text"
-                  placeholder="Quest requirements and instructions..."
-                  value={taskDescription}
-                  onChange={(e) => setTaskDescription(e.target.value)}
-                  className="w-full glass-input rounded-xl px-3.5 py-2.5 text-xs text-slate-100"
-                />
-              </div>
-
-              <div className="sm:col-span-2 lg:col-span-3 flex justify-end">
+              {/* Publish Task Button */}
+              <div className="flex justify-end pt-2">
                 <button
                   type="submit"
-                  className="px-6 py-2.5 rounded-xl electric-gradient-btn text-xs font-bold text-white shadow-lg inline-flex items-center gap-1.5"
+                  disabled={isDetecting || !taskVideoUrl.trim()}
+                  className="w-full sm:w-auto px-8 py-3.5 rounded-xl electric-gradient-btn text-xs font-bold text-white shadow-lg inline-flex items-center justify-center gap-2 hover:scale-[1.02] transition-transform disabled:opacity-50"
                 >
-                  <Plus className="w-4 h-4" /> Publish Quest
+                  <Plus className="w-4 h-4" /> Publish Task
                 </button>
               </div>
             </form>
@@ -503,14 +686,13 @@ export const AdminPanelView: React.FC = () => {
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
               {tasks.map((t) => (
                 <div key={t.id} className="p-4 rounded-2xl bg-slate-900/60 border border-slate-800 space-y-3 flex flex-col justify-between">
-                  <div className="flex space-x-3">
+                  <div className="flex space-x-3 min-w-0">
                     <img src={t.thumbnail} alt={t.title} className="w-14 h-14 rounded-xl object-cover shrink-0 border border-slate-700" />
-                    <div>
+                    <div className="min-w-0 flex-1">
                       <span className="text-[9px] font-bold uppercase text-purple-300 bg-purple-500/20 px-2 py-0.5 rounded border border-purple-500/30">
                         {t.category}
                       </span>
-                      <h4 className="text-xs font-bold text-slate-200 mt-1">{t.title}</h4>
-                      <p className="text-[10px] text-slate-400 line-clamp-1">{t.description}</p>
+                      <h4 className="text-xs font-bold text-slate-200 mt-1 line-clamp-2">{t.title}</h4>
                     </div>
                   </div>
 

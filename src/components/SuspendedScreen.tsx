@@ -30,7 +30,7 @@ export const SuspendedScreen: React.FC = () => {
           <p className="font-semibold text-slate-300 flex items-center gap-2">
             <Mail className="w-4 h-4 text-purple-400" /> Need Help or Appeals?
           </p>
-          <p>Please contact compliance support at <a href="mailto:support@velouraquest.app" className="text-purple-400 underline">support@velouraquest.app</a> with your registered email ({userProfile?.email}).</p>
+          <p>Please contact compliance support at <a href="mailto:support@veloura-quest.vercel.app" className="text-purple-400 underline">support@veloura-quest.vercel.app</a> with your registered email ({userProfile?.email}).</p>
         </div>
 
         <button

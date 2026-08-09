@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { Zap, User, Mail, Lock, Gift, UserPlus, AlertCircle } from 'lucide-react';
 
@@ -10,6 +10,16 @@ export const RegisterView: React.FC = () => {
   const [referralCode, setReferralCode] = useState<string>('');
   const [error, setError] = useState<string>('');
   const [loading, setLoading] = useState<boolean>(false);
+
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const params = new URLSearchParams(window.location.search);
+      const codeParam = params.get('code') || params.get('ref');
+      if (codeParam) {
+        setReferralCode(codeParam);
+      }
+    }
+  }, []);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();

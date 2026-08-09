@@ -23,12 +23,12 @@ export const LoginView: React.FC = () => {
   };
 
   const fillDemoUser = () => {
-    setEmail('demo@velouraquest.app');
+    setEmail('demo@veloura-quest.vercel.app');
     setPassword('password123');
   };
 
   const fillDemoAdmin = () => {
-    setEmail('admin@velouraquest.app');
+    setEmail('admin@veloura-quest.vercel.app');
     setPassword('admin123');
   };
 

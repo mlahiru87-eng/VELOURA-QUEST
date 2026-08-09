@@ -39,7 +39,7 @@ export const HomeDashboardView: React.FC = () => {
     .filter((tc) => isTaskCompletedToday(tc.completedAt))
     .reduce((sum, tc) => sum + (tc.claimedAmount || 0), 0);
 
-  const referralLink = `https://velouraquest.app/ref?code=${userProfile.referralCode}`;
+  const referralLink = `https://veloura-quest.vercel.app/ref?code=${userProfile.referralCode}`;
 
   const copyReferral = () => {
     navigator.clipboard.writeText(referralLink);
@@ -189,7 +189,6 @@ export const HomeDashboardView: React.FC = () => {
                       {task.category}
                     </span>
                     <h4 className="text-xs font-bold text-slate-100 mt-1 line-clamp-1">{task.title}</h4>
-                    <p className="text-[11px] text-slate-400 line-clamp-2 mt-0.5">{task.description}</p>
                   </div>
                 </div>
 

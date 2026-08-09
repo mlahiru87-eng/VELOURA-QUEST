@@ -288,13 +288,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           } else {
             const newProfile: UserProfile = {
               uid: user.uid,
-              email: user.email || 'user@velouraquest.app',
+              email: user.email || 'user@veloura-quest.vercel.app',
               displayName: user.displayName || user.email?.split('@')[0] || 'Quest Explorer',
               photoURL: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150&auto=format&fit=crop&q=80',
               referralCode: 'VQ-' + Math.floor(1000 + Math.random() * 9000),
               currentBalance: 10.00,
               totalEarned: 10.00,
-              role: user.email === 'admin@velouraquest.app' ? 'admin' : 'user',
+              role: user.email === 'admin@veloura-quest.vercel.app' ? 'admin' : 'user',
               createdAt: new Date().toISOString(),
               hasSeenOnboarding: false,
               isFlagged: false
@@ -458,7 +458,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       const cred = await createUserWithEmailAndPassword(auth, email, pass);
       const newUid = cred.user.uid;
       const generatedRefCode = 'VQ-' + Math.floor(1000 + Math.random() * 9000);
-      const isFirstAdmin = email === 'admin@velouraquest.app';
+      const isFirstAdmin = email === 'admin@veloura-quest.vercel.app';
       const initialBonus = 10.00;
 
       const newProfile: UserProfile = {
@@ -957,6 +957,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       targetUrl.searchParams.set('taskId', taskId);
       targetUrl.searchParams.set('userId', userProfile.uid);
       targetUrl.searchParams.set('sessionId', sessionId);
+      targetUrl.searchParams.set('returnUrl', `https://veloura-quest.vercel.app/complete?taskId=${taskId}&sessionId=${sessionId}`);
 
       const redirectUrl = targetUrl.toString();
 

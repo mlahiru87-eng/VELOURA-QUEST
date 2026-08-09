@@ -107,7 +107,6 @@ export const DailyTasksView: React.FC = () => {
                     </div>
 
                     <h3 className="text-sm font-bold text-slate-100">{task.title}</h3>
-                    <p className="text-xs text-slate-400 leading-relaxed max-w-xl">{task.description}</p>
                   </div>
                 </div>
 

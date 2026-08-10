@@ -89,17 +89,29 @@ export const TaskExecutionModal: React.FC<TaskExecutionModalProps> = ({ task, on
           </div>
         </div>
 
-        {/* Execution Timer & Action Section */}
+        {/* Execution Requirement Info & Action Section */}
         <div className="space-y-4 pt-2 border-t border-slate-800/80">
           {!isAlreadyCompleted && (
-            <button
-              onClick={handleStartTask}
-              disabled={isStarting}
-              className="w-full py-3.5 rounded-xl electric-gradient-btn text-sm font-bold text-white shadow-lg flex items-center justify-center gap-2 group disabled:opacity-50"
-            >
-              <Play className="w-4 h-4 fill-white transition-transform group-hover:scale-110" />
-              <span>{isStarting ? 'Redirecting to External Quest...' : `Start Quest (${task.duration ?? task.durationSeconds ?? 30} Seconds)`}</span>
-            </button>
+            <>
+              <div className="p-3.5 rounded-2xl bg-slate-900/90 border border-purple-500/20 text-xs text-slate-300 space-y-1">
+                <div className="flex items-center gap-1.5 font-bold text-purple-300">
+                  <Clock className="w-4 h-4 text-purple-400" />
+                  <span>30-Second Task Visit Required</span>
+                </div>
+                <p className="text-[11px] text-slate-400 leading-relaxed">
+                  Please stay on the task page for at least 30 seconds. Your stay duration is calculated securely using server timestamps before awarding the reward.
+                </p>
+              </div>
+
+              <button
+                onClick={handleStartTask}
+                disabled={isStarting}
+                className="w-full py-3.5 rounded-xl electric-gradient-btn text-sm font-bold text-white shadow-lg flex items-center justify-center gap-2 group disabled:opacity-50"
+              >
+                <Play className="w-4 h-4 fill-white transition-transform group-hover:scale-110" />
+                <span>{isStarting ? 'Starting Task Timer & Redirecting...' : 'Start Task (30 Seconds)'}</span>
+              </button>
+            </>
           )}
 
           {isCompleted && !isAlreadyCompleted && !claimedSuccess && (
@@ -109,7 +121,7 @@ export const TaskExecutionModal: React.FC<TaskExecutionModalProps> = ({ task, on
               className="w-full py-3.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-sm font-bold text-white shadow-xl glow-purple flex items-center justify-center gap-2 transition-all animate-bounce"
             >
               <Sparkles className="w-5 h-5 text-amber-300" />
-              <span>{isClaiming ? 'Claiming Reward...' : `Claim $${task.rewardAmount.toFixed(2)} Reward`}</span>
+              <span>{isClaiming ? 'Claiming Reward...' : `Claim $${(task.reward ?? task.rewardAmount ?? 0).toFixed(2)} Reward`}</span>
             </button>
           )}
 

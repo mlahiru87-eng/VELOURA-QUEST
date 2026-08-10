@@ -1,22 +1,22 @@
 import React, { useEffect, useState } from 'react';
 import { useAuth } from '../context/AuthContext';
-import { doc, getDoc, runTransaction, updateDoc, collection } from 'firebase/firestore';
+import { doc, getDoc, runTransaction, updateDoc, collection, query, where, getDocs, addDoc } from 'firebase/firestore';
 import { db } from '../lib/firebase';
 import { telemetry } from '../lib/telemetry';
-import { CheckCircle2, AlertCircle, ShieldAlert, Zap, Clock, ArrowLeft, RefreshCw, DollarSign, ExternalLink } from 'lucide-react';
+import { CheckCircle2, AlertCircle, ShieldAlert, Zap, Clock, ArrowLeft, RefreshCw, DollarSign } from 'lucide-react';
 
 export const QuestCompleteView: React.FC = () => {
-  const { currentUser, setCurrentPage, refreshData, loading: authLoading } = useAuth();
+  const { currentUser, setCurrentPage, refreshData, startTaskSession, loading: authLoading } = useAuth();
 
   const [verifying, setVerifying] = useState<boolean>(true);
   const [statusState, setStatusState] = useState<'success' | 'already_claimed' | 'error'>('success');
   const [errorType, setErrorType] = useState<
-    'unauthenticated' | 'invalid_session' | 'session_not_completed' | 'wrong_user' | 'task_not_found' | 'already_claimed' | 'network_error' | null
+    'unauthenticated' | 'invalid_session' | 'too_early' | 'wrong_user' | 'task_not_found' | 'already_claimed' | 'network_error' | null
   >(null);
   const [errorMessage, setErrorMessage] = useState<string>('');
   const [claimedReward, setClaimedReward] = useState<number>(0);
+  const [elapsedTimeInfo, setElapsedTimeInfo] = useState<{ spent: number; required: number } | null>(null);
   const [taskInfo, setTaskInfo] = useState<{ title: string; category: string } | null>(null);
-  const [simulatingCompletion, setSimulatingCompletion] = useState<boolean>(false);
 
   // Parse URL query parameters
   const urlParams = new URLSearchParams(window.location.search);
@@ -44,6 +44,8 @@ export const QuestCompleteView: React.FC = () => {
     setErrorType(null);
 
     try {
+      let finalReward = 0;
+
       // Execute Atomic Transaction for Reward Claiming
       await runTransaction(db, async (tx) => {
         // 1. Fetch taskSessions doc inside transaction
@@ -73,12 +75,47 @@ export const QuestCompleteView: React.FC = () => {
           throw { code: 'ALREADY_CLAIMED', message: 'Reward Already Claimed.' };
         }
 
-        // Check if status is completed
-        if (sessionData.status !== 'completed') {
-          throw { code: 'SESSION_NOT_COMPLETED', message: 'Quest session has not been marked as completed by external verification service.' };
+        // Check if attempt previously failed
+        if (sessionData.status === 'failed' || sessionData.status === 'expired') {
+          throw { code: 'TOO_EARLY', message: 'You left the task too early. Please stay on the task page for 30 seconds.' };
         }
 
-        // 2. Fetch tasks doc inside transaction to get official reward amount
+        // 2. SERVER TIMESTAMP 30-SECOND VISIT CHECK
+        let startedAtMs = 0;
+        if (sessionData.startedAt) {
+          if (typeof sessionData.startedAt.toMillis === 'function') {
+            startedAtMs = sessionData.startedAt.toMillis();
+          } else if (typeof sessionData.startedAt.seconds === 'number') {
+            startedAtMs = sessionData.startedAt.seconds * 1000;
+          } else if (typeof sessionData.startedAt === 'string') {
+            startedAtMs = new Date(sessionData.startedAt).getTime();
+          } else if (typeof sessionData.startedAt === 'number') {
+            startedAtMs = sessionData.startedAt;
+          }
+        }
+
+        const requiredSeconds = typeof sessionData.requiredSeconds === 'number' ? sessionData.requiredSeconds : 30;
+        const nowMs = Date.now();
+        const elapsedSeconds = startedAtMs > 0 ? Math.floor((nowMs - startedAtMs) / 1000) : 0;
+
+        // If returned before required 30 seconds:
+        if (elapsedSeconds < requiredSeconds) {
+          tx.update(sessionRef, {
+            status: 'failed',
+            failedReason: 'left_early',
+            failedAt: new Date().toISOString(),
+            elapsedSeconds
+          });
+
+          throw {
+            code: 'TOO_EARLY',
+            message: 'You left the task too early. Please stay on the task page for 30 seconds.',
+            elapsedSeconds,
+            requiredSeconds
+          };
+        }
+
+        // 3. Fetch tasks doc inside transaction to get official reward amount
         const taskRef = doc(db, 'tasks', taskId);
         const taskSnap = await tx.get(taskRef);
 
@@ -91,7 +128,9 @@ export const QuestCompleteView: React.FC = () => {
           ? taskData.reward
           : (typeof taskData.rewardAmount === 'number' ? taskData.rewardAmount : 5.00);
 
-        // 3. Fetch user profile inside transaction
+        finalReward = officialReward;
+
+        // 4. Fetch user profile inside transaction
         const userRef = doc(db, 'users', currentUser.uid);
         const userSnap = await tx.get(userRef);
 
@@ -113,8 +152,11 @@ export const QuestCompleteView: React.FC = () => {
         });
 
         tx.update(sessionRef, {
+          status: 'completed',
           rewardStatus: 'credited',
-          creditedAt: new Date().toISOString()
+          completedAt: new Date().toISOString(),
+          creditedAt: new Date().toISOString(),
+          elapsedSeconds
         });
 
         const txRef = doc(db, 'transactions', `tx_${sessionId}`);
@@ -125,7 +167,7 @@ export const QuestCompleteView: React.FC = () => {
           amount: officialReward,
           type: 'task_reward',
           status: 'completed',
-          description: `Reward for completing quest: ${taskData.title || 'External Quest'}`,
+          description: `Reward for completing quest: ${taskData.title || 'Veloura Quest'}`,
           createdAt: new Date().toISOString()
         });
 
@@ -141,8 +183,8 @@ export const QuestCompleteView: React.FC = () => {
         const notifRef = doc(collection(db, 'notifications'));
         tx.set(notifRef, {
           userId: currentUser.uid,
-          title: 'Quest Completed!',
-          message: 'Quest completed! Your reward has been added.',
+          title: '✓ Task Completed',
+          message: `✓ Task Completed! +$${officialReward.toFixed(2)} reward added to your wallet.`,
           type: 'reward',
           read: false,
           createdAt: new Date().toISOString()
@@ -150,6 +192,60 @@ export const QuestCompleteView: React.FC = () => {
       });
 
       telemetry.recordFirestoreWrite();
+
+      // Check & trigger referral bonus if this was user's 1st completed task
+      try {
+        const completionsQuery = query(collection(db, 'taskCompletions'), where('userId', '==', currentUser.uid));
+        const completionsSnap = await getDocs(completionsQuery);
+        if (completionsSnap.size === 1) {
+          const qRefPending = query(
+            collection(db, 'referrals'),
+            where('refereeId', '==', currentUser.uid),
+            where('status', '==', 'pending')
+          );
+          const pendingSnap = await getDocs(qRefPending);
+          if (!pendingSnap.empty) {
+            const refDoc = pendingSnap.docs[0];
+            const refData = refDoc.data();
+            const rewardAmount = refData.rewardAmount || 5.00;
+
+            await updateDoc(doc(db, 'referrals', refDoc.id), {
+              status: 'completed',
+              completedAt: new Date().toISOString()
+            });
+
+            const referrerUserRef = doc(db, 'users', refData.referrerId);
+            const referrerSnap = await getDoc(referrerUserRef);
+            if (referrerSnap.exists()) {
+              const referrerProfile = referrerSnap.data();
+              await updateDoc(referrerUserRef, {
+                currentBalance: (referrerProfile.currentBalance || 0) + rewardAmount,
+                totalEarned: (referrerProfile.totalEarned || 0) + rewardAmount
+              });
+
+              await addDoc(collection(db, 'transactions'), {
+                userId: refData.referrerId,
+                type: 'referral_bonus',
+                amount: rewardAmount,
+                description: `Referral Bonus: ${currentUser.displayName || 'Friend'} completed 1st task!`,
+                status: 'completed',
+                createdAt: new Date().toISOString()
+              });
+
+              await addDoc(collection(db, 'notifications'), {
+                userId: refData.referrerId,
+                title: 'Referral Bonus Unlocked!',
+                message: `${currentUser.displayName || 'Friend'} completed their first quest! $${rewardAmount.toFixed(2)} referral bonus was added to your wallet.`,
+                type: 'reward',
+                read: false,
+                createdAt: new Date().toISOString()
+              });
+            }
+          }
+        }
+      } catch (refErr) {
+        console.warn('Referral check non-blocking error:', refErr);
+      }
 
       // Read task info for UI presentation
       try {
@@ -159,9 +255,11 @@ export const QuestCompleteView: React.FC = () => {
           const reward = typeof t.reward === 'number' ? t.reward : (typeof t.rewardAmount === 'number' ? t.rewardAmount : 5.00);
           setClaimedReward(reward);
           setTaskInfo({ title: t.title || 'Veloura Quest', category: t.category || 'Video' });
+        } else {
+          setClaimedReward(finalReward || 5.00);
         }
       } catch (e) {
-        console.warn('Could not read task details for presentation', e);
+        setClaimedReward(finalReward || 5.00);
       }
 
       setStatusState('success');
@@ -184,10 +282,16 @@ export const QuestCompleteView: React.FC = () => {
         setStatusState('already_claimed');
         setErrorType('already_claimed');
         setErrorMessage('Reward Already Claimed');
+      } else if (err && err.code === 'TOO_EARLY') {
+        setStatusState('error');
+        setErrorType('too_early');
+        const spent = typeof err.elapsedSeconds === 'number' ? err.elapsedSeconds : 0;
+        const req = typeof err.requiredSeconds === 'number' ? err.requiredSeconds : 30;
+        setElapsedTimeInfo({ spent, required: req });
+        setErrorMessage('You left the task too early. Please stay on the task page for 30 seconds.');
       } else if (err && err.code) {
         setStatusState('error');
         if (err.code === 'INVALID_SESSION') setErrorType('invalid_session');
-        else if (err.code === 'SESSION_NOT_COMPLETED') setErrorType('session_not_completed');
         else if (err.code === 'WRONG_USER') setErrorType('wrong_user');
         else if (err.code === 'TASK_NOT_FOUND') setErrorType('task_not_found');
         else setErrorType('network_error');
@@ -208,35 +312,15 @@ export const QuestCompleteView: React.FC = () => {
     }
   }, [authLoading, currentUser, taskId, sessionId]);
 
-  // Helper function for external verification simulation in preview environment
-  const handleSimulateCompletion = async () => {
-    if (!sessionId) return;
-    setSimulatingCompletion(true);
-    try {
-      const sessionRef = doc(db, 'taskSessions', sessionId);
-      await updateDoc(sessionRef, {
-        status: 'completed',
-        completedAt: new Date().toISOString()
-      });
-      telemetry.recordFirestoreWrite();
-      await verifyAndClaimReward();
-    } catch (err) {
-      console.error('Error setting session status to completed:', err);
-      setErrorMessage('Failed to update session status in Firestore.');
-    } finally {
-      setSimulatingCompletion(false);
-    }
-  };
-
   if (authLoading || verifying) {
     return (
       <div className="min-h-[70vh] flex flex-col items-center justify-center p-6 text-center">
         <div className="w-16 h-16 rounded-2xl electric-gradient-btn animate-spin flex items-center justify-center text-white glow-purple mb-6 shadow-xl">
           <Zap className="w-8 h-8 fill-white/20" />
         </div>
-        <h2 className="text-xl font-bold text-slate-100 mb-2">Verifying Quest Session...</h2>
+        <h2 className="text-xl font-bold text-slate-100 mb-2">Verifying Quest Completion...</h2>
         <p className="text-xs text-slate-400 max-w-md font-mono">
-          Connecting to Veloura Firestore to validate task session parameters...
+          Evaluating 30-second server timestamp visit duration in Firestore...
         </p>
       </div>
     );
@@ -258,13 +342,13 @@ export const QuestCompleteView: React.FC = () => {
 
             <div>
               <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 text-xs font-extrabold uppercase tracking-widest mb-2">
-                ✓ Quest Completed
+                ✓ Task Completed
               </span>
-              <h1 className="text-2xl font-black text-slate-100 tracking-tight">Reward Added</h1>
+              <h1 className="text-2xl font-black text-slate-100 tracking-tight">Reward Added to Your Wallet</h1>
             </div>
 
             <div className="py-4 px-6 rounded-2xl bg-slate-900/80 border border-slate-800 w-full flex flex-col items-center">
-              <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1">Credited Balance</span>
+              <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1">Credited Reward</span>
               <span className="text-4xl font-black text-emerald-400 tracking-tight font-mono">
                 +${claimedReward.toFixed(2)}
               </span>
@@ -273,6 +357,9 @@ export const QuestCompleteView: React.FC = () => {
                   {taskInfo.title}
                 </p>
               )}
+              <p className="text-[11px] text-slate-400 mt-2">
+                Reward added to your wallet.
+              </p>
             </div>
 
             <button
@@ -300,7 +387,7 @@ export const QuestCompleteView: React.FC = () => {
             </div>
 
             <p className="text-xs text-slate-300 leading-relaxed max-w-sm">
-              The reward for this quest session (${claimedReward.toFixed(2)}) has already been credited to your account balance.
+              The reward for this quest session (${claimedReward.toFixed(2)}) has already been credited to your wallet balance.
             </p>
 
             <button
@@ -313,8 +400,60 @@ export const QuestCompleteView: React.FC = () => {
           </div>
         )}
 
-        {/* 3. ERROR STATES */}
-        {statusState === 'error' && (
+        {/* 3. RETURNED TOO EARLY STATE */}
+        {statusState === 'error' && errorType === 'too_early' && (
+          <div className="flex flex-col items-center text-center space-y-6">
+            <div className="w-20 h-20 rounded-full bg-rose-500/20 border-2 border-rose-500/40 flex items-center justify-center text-rose-400 shadow-xl">
+              <Clock className="w-10 h-10" />
+            </div>
+
+            <div>
+              <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-rose-500/10 border border-rose-500/30 text-rose-400 text-xs font-extrabold uppercase tracking-widest mb-2">
+                Try Again
+              </span>
+              <h1 className="text-2xl font-black text-slate-100 tracking-tight">
+                You left the task too early.
+              </h1>
+              <p className="text-xs text-slate-300 mt-2 max-w-sm leading-relaxed">
+                Please stay on the task page for 30 seconds.
+              </p>
+            </div>
+
+            {elapsedTimeInfo && (
+              <div className="py-3.5 px-5 rounded-2xl bg-slate-900/90 border border-slate-800 w-full font-mono text-xs text-slate-300 space-y-1.5">
+                <div className="flex justify-between items-center">
+                  <span className="text-slate-500">Your Time Spent:</span>
+                  <span className="text-rose-400 font-bold">{elapsedTimeInfo.spent}s</span>
+                </div>
+                <div className="flex justify-between items-center">
+                  <span className="text-slate-500">Required Time:</span>
+                  <span className="text-emerald-400 font-bold">{elapsedTimeInfo.required}s</span>
+                </div>
+              </div>
+            )}
+
+            <div className="space-y-3 w-full pt-2">
+              <button
+                onClick={() => taskId && startTaskSession(taskId)}
+                className="w-full py-4 rounded-xl electric-gradient-btn text-sm font-bold text-white shadow-xl hover:opacity-95 transition-all flex items-center justify-center gap-2"
+              >
+                <RefreshCw className="w-4 h-4" />
+                <span>Start Task Again</span>
+              </button>
+
+              <button
+                onClick={() => setCurrentPage('home')}
+                className="w-full py-3.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-bold border border-slate-700 transition-all flex items-center justify-center gap-2"
+              >
+                <ArrowLeft className="w-4 h-4" />
+                <span>Back to Dashboard</span>
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* 4. OTHER ERROR STATES */}
+        {statusState === 'error' && errorType !== 'too_early' && (
           <div className="flex flex-col items-center text-center space-y-5">
             <div className="w-16 h-16 rounded-full bg-rose-500/20 border border-rose-500/40 flex items-center justify-center text-rose-400 shadow-lg">
               <ShieldAlert className="w-9 h-9" />
@@ -324,7 +463,6 @@ export const QuestCompleteView: React.FC = () => {
               <h2 className="text-xl font-black text-slate-100 mb-1">
                 {errorType === 'unauthenticated' && 'Authentication Required'}
                 {errorType === 'invalid_session' && 'Invalid Quest Session'}
-                {errorType === 'session_not_completed' && 'Session Not Completed'}
                 {errorType === 'wrong_user' && 'Account Mismatch'}
                 {errorType === 'task_not_found' && 'Quest Task Not Found'}
                 {errorType === 'network_error' && 'Verification Error'}
@@ -333,29 +471,6 @@ export const QuestCompleteView: React.FC = () => {
                 {errorMessage || 'Unable to verify quest completion.'}
               </p>
             </div>
-
-            {/* Special Action for Session Not Completed in Dev environment */}
-            {errorType === 'session_not_completed' && (
-              <div className="w-full p-4 rounded-2xl bg-purple-950/40 border border-purple-500/30 text-left space-y-3">
-                <div className="flex items-center justify-between text-xs font-bold text-purple-300">
-                  <span className="flex items-center gap-1.5">
-                    <Clock className="w-4 h-4 text-purple-400" /> External Service Verification
-                  </span>
-                  <span className="text-[10px] uppercase font-mono text-purple-400">Pending</span>
-                </div>
-                <p className="text-[11px] text-slate-300">
-                  The external quest service has not marked this session as completed in Firestore yet.
-                </p>
-                <button
-                  onClick={handleSimulateCompletion}
-                  disabled={simulatingCompletion}
-                  className="w-full py-2.5 rounded-xl bg-purple-600 hover:bg-purple-500 text-white text-xs font-bold shadow-md flex items-center justify-center gap-2 transition-all disabled:opacity-50"
-                >
-                  <RefreshCw className={`w-3.5 h-3.5 ${simulatingCompletion ? 'animate-spin' : ''}`} />
-                  <span>{simulatingCompletion ? 'Updating Firestore Session...' : 'Mark Session Completed & Claim'}</span>
-                </button>
-              </div>
-            )}
 
             {errorType === 'unauthenticated' && (
               <button

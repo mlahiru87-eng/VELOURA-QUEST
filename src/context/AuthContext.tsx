@@ -908,8 +908,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
 
     try {
-      // 1. Read the task's videoUrl from Firestore
+      // 1. Read the task's videoUrl and duration from Firestore
       let videoUrl = 'https://veloura-etez.vercel.app/video/Lwq20xe9n2eLnBbQqzjC';
+      let duration = 30;
       try {
         telemetry.recordFirestoreRead();
         const taskRef = doc(db, 'tasks', taskId);
@@ -919,17 +920,24 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           if (tData.videoUrl) {
             videoUrl = tData.videoUrl;
           }
+          if (typeof tData.duration === 'number') {
+            duration = tData.duration;
+          } else if (typeof tData.durationSeconds === 'number') {
+            duration = tData.durationSeconds;
+          }
         } else {
           const memTask = tasks.find((t) => t.id === taskId);
-          if (memTask && memTask.videoUrl) {
-            videoUrl = memTask.videoUrl;
+          if (memTask) {
+            if (memTask.videoUrl) videoUrl = memTask.videoUrl;
+            if (memTask.durationSeconds) duration = memTask.durationSeconds;
           }
         }
       } catch (e) {
         console.warn('Could not read task directly from Firestore, falling back to loaded state', e);
         const memTask = tasks.find((t) => t.id === taskId);
-        if (memTask && memTask.videoUrl) {
-          videoUrl = memTask.videoUrl;
+        if (memTask) {
+          if (memTask.videoUrl) videoUrl = memTask.videoUrl;
+          if (memTask.durationSeconds) duration = memTask.durationSeconds;
         }
       }
 
@@ -943,7 +951,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         taskId,
         userId: userProfile.uid,
         status: 'started',
-        startedAt: serverTimestamp()
+        startedAt: serverTimestamp(),
+        requiredSeconds: duration || 30
       };
 
       await setDoc(sessionRef, sessionPayload);
@@ -964,7 +973,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
       const redirectUrl = targetUrl.toString();
 
-      // Do not give reward yet.
+      // Do not give reward yet - user must stay on task page for 30s.
       window.location.href = redirectUrl;
 
       return { success: true, redirectUrl };

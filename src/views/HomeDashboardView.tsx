@@ -40,7 +40,7 @@ export const HomeDashboardView: React.FC = () => {
     .reduce((sum, tc) => sum + (tc.claimedAmount || 0), 0);
 
   const appOrigin = typeof window !== 'undefined' ? window.location.origin : 'https://veloura-quest.vercel.app';
-  const referralLink = `${appOrigin}/ref?code=${userProfile.referralCode}`;
+  const referralLink = `${appOrigin}/?ref=${userProfile.referralCode}`;
 
   const copyReferral = () => {
     navigator.clipboard.writeText(referralLink);

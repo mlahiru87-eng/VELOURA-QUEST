@@ -9,7 +9,7 @@ export const ReferralView: React.FC = () => {
   if (!userProfile) return null;
 
   const appOrigin = typeof window !== 'undefined' ? window.location.origin : 'https://veloura-quest.vercel.app';
-  const referralLink = `${appOrigin}/ref?code=${userProfile.referralCode}`;
+  const referralLink = `${appOrigin}/?ref=${userProfile.referralCode}`;
   
   // Completed referral earnings
   const completedReferrals = referrals.filter(r => r.status === 'completed');

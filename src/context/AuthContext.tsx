@@ -1027,19 +1027,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       targetUrl.searchParams.set('taskId', taskId);
       targetUrl.searchParams.set('userId', userProfile.uid);
       targetUrl.searchParams.set('sessionId', sessionId);
-      targetUrl.searchParams.set('returnUrl', `https://veloura-quest.vercel.app/complete?taskId=${taskId}&sessionId=${sessionId}`);
+      const currentOrigin = typeof window !== 'undefined' ? window.location.origin : 'https://veloura-quest.vercel.app';
+      targetUrl.searchParams.set('returnUrl', `${currentOrigin}/complete?taskId=${taskId}&sessionId=${sessionId}`);
 
       const redirectUrl = targetUrl.toString();
 
-      // Attempt to open in a new tab so user can watch while staying in app, fallback to current window location
-      try {
-        const openedWin = window.open(redirectUrl, '_blank');
-        if (!openedWin || openedWin.closed || typeof openedWin.closed === 'undefined') {
-          window.location.href = redirectUrl;
-        }
-      } catch (e) {
-        window.location.href = redirectUrl;
-      }
+      // Navigate directly in the same window/tab
+      window.location.href = redirectUrl;
 
       return { success: true, redirectUrl, sessionId };
     } catch (err) {

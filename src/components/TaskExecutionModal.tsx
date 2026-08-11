@@ -151,7 +151,7 @@ export const TaskExecutionModal: React.FC<TaskExecutionModalProps> = ({ task, on
             <div className="p-4 rounded-2xl bg-rose-500/15 border border-rose-500/40 text-rose-300 space-y-2 animate-fade-in">
               <div className="flex items-center gap-2 font-black text-rose-400 text-sm">
                 <AlertCircle className="w-5 h-5" />
-                <span>Try Again (ට්රයි අගේන්)</span>
+                <span>Try Again</span>
               </div>
               <p className="text-xs leading-relaxed text-rose-200/90">
                 You left the task page too early! Please stay on the task page for the full 30 seconds to unlock your reward.
@@ -241,7 +241,7 @@ export const TaskExecutionModal: React.FC<TaskExecutionModalProps> = ({ task, on
                     className="w-full py-4 rounded-xl bg-gradient-to-r from-emerald-500 via-teal-500 to-emerald-600 hover:from-emerald-400 hover:to-teal-500 text-base font-black text-white shadow-2xl glow-emerald flex items-center justify-center gap-2.5 transition-all animate-bounce"
                   >
                     <Sparkles className="w-5 h-5 text-amber-300" />
-                    <span>{isClaiming ? 'Claiming Reward...' : `Claim Rewards (කලේම් රිවෝර්ඩ්ස් - $${rewardVal.toFixed(2)})`}</span>
+                    <span>{isClaiming ? 'Claiming Reward...' : `Claim Rewards ($${rewardVal.toFixed(2)})`}</span>
                   </button>
                 </div>
               )}

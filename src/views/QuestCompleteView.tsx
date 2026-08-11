@@ -368,7 +368,7 @@ export const QuestCompleteView: React.FC = () => {
             >
               <Sparkles className="w-5 h-5 text-amber-300" />
               <span>
-                {isClaimingInView ? 'Claiming Reward...' : `Claim Rewards (කලේම් රිවෝර්ඩ්ස් - $${claimedReward.toFixed(2)})`}
+                {isClaimingInView ? 'Claiming Reward...' : `Claim Rewards ($${claimedReward.toFixed(2)})`}
               </span>
             </button>
           </div>
@@ -438,7 +438,7 @@ export const QuestCompleteView: React.FC = () => {
           </div>
         )}
 
-        {/* 4. RETURNED TOO EARLY STATE ("TRY AGAIN / ට්රයි අගේන්") */}
+        {/* 4. RETURNED TOO EARLY STATE ("TRY AGAIN") */}
         {statusState === 'error' && errorType === 'too_early' && (
           <div className="flex flex-col items-center text-center space-y-6">
             <div className="w-20 h-20 rounded-full bg-rose-500/20 border-2 border-rose-500/40 flex items-center justify-center text-rose-400 shadow-xl">
@@ -447,7 +447,7 @@ export const QuestCompleteView: React.FC = () => {
 
             <div>
               <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-rose-500/20 border border-rose-500/40 text-rose-300 text-xs font-black uppercase tracking-widest mb-2">
-                Try Again (ට්රයි අගේන්)
+                Try Again
               </span>
               <h1 className="text-2xl font-black text-slate-100 tracking-tight">
                 You left the task too early.

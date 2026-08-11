@@ -84,3 +84,52 @@
   background: rgba(225, 29, 72, 0.6);
 }
 
+@keyframes pulseGlow {
+  0%, 100% {
+    box-shadow: 0 0 15px rgba(225, 29, 72, 0.4), inset 0 0 10px rgba(225, 29, 72, 0.2);
+    border-color: rgba(244, 63, 94, 0.8);
+  }
+  50% {
+    box-shadow: 0 0 35px rgba(244, 63, 94, 0.8), inset 0 0 20px rgba(244, 63, 94, 0.4);
+    border-color: rgba(255, 255, 255, 0.9);
+  }
+}
+
+@keyframes floatSlow {
+  0%, 100% {
+    transform: translateY(0px) rotate(0deg);
+  }
+  50% {
+    transform: translateY(-8px) rotate(1.5deg);
+  }
+}
+
+@keyframes textShimmer {
+  0% {
+    background-position: 0% 50%;
+  }
+  50% {
+    background-position: 100% 50%;
+  }
+  100% {
+    background-position: 0% 50%;
+  }
+}
+
+.animated-18-badge {
+  animation: pulseGlow 2.5s infinite ease-in-out;
+}
+
+.animated-float {
+  animation: floatSlow 4s infinite ease-in-out;
+}
+
+.shimmer-text {
+  background: linear-gradient(90deg, #f87171, #fb7185, #f43f5e, #ffffff, #fb7185, #f87171);
+  background-size: 200% auto;
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  animation: textShimmer 3s linear infinite;
+}
+
+

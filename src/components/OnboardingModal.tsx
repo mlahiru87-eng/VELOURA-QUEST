@@ -27,7 +27,7 @@ export const OnboardingModal: React.FC = () => {
       badge: "Step 2 of 3",
       bullets: [
         `Your unique referral code is: ${userProfile.referralCode}`,
-        "Friends get $10.00 welcome bonus when registering.",
+        "Friends get $5.00 welcome bonus when registering.",
         "You unlock $5.00 cash as soon as your friend completes 1 quest!"
       ]
     },
@@ -38,7 +38,7 @@ export const OnboardingModal: React.FC = () => {
       badge: "Step 3 of 3",
       bullets: [
         "PayPal, USDT Crypto, Bank Transfer, and Amazon Gift Cards.",
-        "Low minimum payout threshold of $15.00.",
+        "Minimum withdrawal threshold of 20 USDT.",
         "Real-time transaction log & withdrawal status tracker."
       ]
     }

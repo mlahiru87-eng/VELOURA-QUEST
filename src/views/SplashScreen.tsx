@@ -1,6 +1,6 @@
 import React from 'react';
 import { useAuth } from '../context/AuthContext';
-import { Zap, Sparkles, ChevronRight, ShieldCheck, Trophy, Gift } from 'lucide-react';
+import { Zap, Sparkles, ChevronRight, ShieldCheck, Trophy, Gift, Flame, Lock } from 'lucide-react';
 
 export const SplashScreen: React.FC = () => {
   const { setCurrentPage } = useAuth();
@@ -8,55 +8,66 @@ export const SplashScreen: React.FC = () => {
   return (
     <div id="splash-view" className="min-h-screen flex flex-col items-center justify-between p-6 relative overflow-hidden bg-slate-950">
       {/* Background Lighting Gradients */}
-      <div className="absolute top-1/4 left-1/2 -translate-x-1/2 -translate-y-1/2 w-96 h-96 bg-purple-600/25 rounded-full blur-3xl pointer-events-none"></div>
-      <div className="absolute bottom-10 right-10 w-80 h-80 bg-blue-600/20 rounded-full blur-3xl pointer-events-none"></div>
+      <div className="absolute top-1/4 left-1/2 -translate-x-1/2 -translate-y-1/2 w-96 h-96 bg-rose-600/30 rounded-full blur-3xl pointer-events-none"></div>
+      <div className="absolute bottom-10 right-10 w-80 h-80 bg-red-600/20 rounded-full blur-3xl pointer-events-none"></div>
 
-      {/* Top Brand Tag */}
+      {/* Top Brand Tag & 18+ Badge */}
       <div className="w-full flex justify-between items-center max-w-md pt-4 z-10">
         <div className="flex items-center space-x-2">
-          <div className="w-8 h-8 rounded-lg electric-gradient-btn flex items-center justify-center text-white glow-purple">
+          <div className="w-8 h-8 rounded-lg electric-gradient-btn flex items-center justify-center text-white glow-red">
             <Zap className="w-5 h-5 fill-white/20" />
           </div>
           <span className="text-sm font-black tracking-widest electric-gradient-text uppercase">Veloura Quest</span>
         </div>
-        <span className="px-2.5 py-1 rounded-full text-[10px] font-bold bg-purple-500/10 text-purple-300 border border-purple-500/20">
-          v2.4 Live
-        </span>
+        <div className="flex items-center space-x-2">
+          <span className="px-2.5 py-1 rounded-full text-[10px] font-black bg-rose-600 text-white border border-rose-400 animated-18-badge flex items-center gap-1 shadow-lg">
+            <Lock className="w-3 h-3" /> 18+ ONLY
+          </span>
+          <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-slate-900 text-slate-300 border border-slate-700">
+            v2.4 Live
+          </span>
+        </div>
       </div>
 
       {/* Main Hero Card */}
       <div className="w-full max-w-md my-auto space-y-6 z-10 text-center">
-        <div className="relative inline-block mx-auto mb-2">
-          <div className="w-24 h-24 rounded-3xl electric-gradient-btn flex items-center justify-center text-white shadow-2xl glow-purple mx-auto animate-pulse">
+        <div className="relative inline-block mx-auto mb-2 animated-float">
+          <div className="w-24 h-24 rounded-3xl electric-gradient-btn flex items-center justify-center text-white shadow-2xl glow-red mx-auto relative overflow-hidden">
             <Trophy className="w-12 h-12 text-amber-300" />
+            <span className="absolute bottom-1 right-1 text-[11px] font-black px-1.5 py-0.5 rounded bg-black/80 text-rose-400 border border-rose-500/50">
+              18+
+            </span>
           </div>
-          <div className="absolute -top-2 -right-2 p-1.5 rounded-full bg-blue-500 text-white shadow-md">
-            <Sparkles className="w-4 h-4" />
+          <div className="absolute -top-2 -right-2 p-1.5 rounded-full bg-rose-600 text-white shadow-md animate-bounce">
+            <Flame className="w-4 h-4 fill-white" />
           </div>
         </div>
 
         <div>
+          <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[10px] font-bold bg-rose-500/20 text-rose-300 border border-rose-500/40 mb-3 animate-pulse">
+            <Sparkles className="w-3.5 h-3.5 text-rose-400" /> 18+ Mature Web Quests & Rewards Portal
+          </div>
           <h1 className="text-3xl sm:text-4xl font-black text-white tracking-tight leading-tight">
-            Earn Cash Rewards with <span className="electric-gradient-text">Daily Quests</span>
+            Adult Earn Hub <br /><span className="shimmer-text">18+ Premium Quests</span>
           </h1>
           <p className="text-xs text-slate-300 mt-3 leading-relaxed px-4">
-            Complete 5 high-yield daily tasks, invite friends for instant cash bonuses, and withdraw earnings seamlessly to PayPal or Crypto.
+            Exclusive 18+ rewarded web quests. Complete 5 high-yield daily tasks, invite friends, and instantly withdraw cash rewards to your wallet.
           </p>
         </div>
 
         {/* Feature Badges Grid */}
         <div className="grid grid-cols-3 gap-2 pt-2">
-          <div className="p-3 glass-panel rounded-2xl text-center space-y-1">
-            <Gift className="w-5 h-5 text-purple-400 mx-auto" />
-            <span className="text-[10px] font-bold text-slate-200 block">5 Daily Tasks</span>
+          <div className="p-3 glass-panel rounded-2xl text-center space-y-1 hover:border-rose-500/40 transition-all">
+            <Gift className="w-5 h-5 text-rose-400 mx-auto" />
+            <span className="text-[10px] font-bold text-slate-200 block">5 Daily Quests</span>
           </div>
-          <div className="p-3 glass-panel rounded-2xl text-center space-y-1">
+          <div className="p-3 glass-panel rounded-2xl text-center space-y-1 hover:border-amber-500/40 transition-all">
             <Trophy className="w-5 h-5 text-amber-400 mx-auto" />
             <span className="text-[10px] font-bold text-slate-200 block">$5 Referral</span>
           </div>
-          <div className="p-3 glass-panel rounded-2xl text-center space-y-1">
+          <div className="p-3 glass-panel rounded-2xl text-center space-y-1 hover:border-emerald-500/40 transition-all">
             <ShieldCheck className="w-5 h-5 text-emerald-400 mx-auto" />
-            <span className="text-[10px] font-bold text-slate-200 block">Fast Cashout</span>
+            <span className="text-[10px] font-bold text-slate-200 block">Fast 18+ Cashout</span>
           </div>
         </div>
       </div>
@@ -66,9 +77,9 @@ export const SplashScreen: React.FC = () => {
         <button
           id="splash-get-started"
           onClick={() => setCurrentPage('register')}
-          className="w-full py-4 rounded-2xl electric-gradient-btn text-sm font-bold text-white shadow-xl glow-purple flex items-center justify-center gap-2 group transition-all"
+          className="w-full py-4 rounded-2xl electric-gradient-btn text-sm font-bold text-white shadow-xl glow-red flex items-center justify-center gap-2 group transition-all"
         >
-          <span>Get Started & Claim Bonus</span>
+          <span>Confirm 18+ & Claim $5.00 Bonus</span>
           <ChevronRight className="w-4 h-4 transition-transform group-hover:translate-x-1" />
         </button>
 
@@ -77,9 +88,10 @@ export const SplashScreen: React.FC = () => {
           onClick={() => setCurrentPage('login')}
           className="w-full py-3.5 rounded-2xl glass-panel hover:bg-slate-800/80 text-xs font-semibold text-slate-300 transition-colors"
         >
-          Already have an account? Sign In
+          Already verified? Sign In
         </button>
       </div>
     </div>
   );
 };
+

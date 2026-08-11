@@ -43,9 +43,14 @@ export const Navbar: React.FC = () => {
             <Zap className="w-6 h-6 fill-white/20 text-white" />
           </div>
           <div>
-            <h1 className="text-lg font-black tracking-wider uppercase electric-gradient-text leading-tight">
-              Veloura Quest
-            </h1>
+            <div className="flex items-center space-x-2">
+              <h1 className="text-lg font-black tracking-wider uppercase electric-gradient-text leading-tight">
+                Veloura Quest
+              </h1>
+              <span className="px-1.5 py-0.5 rounded text-[9px] font-black bg-rose-600 text-white border border-rose-400 animated-18-badge">
+                18+
+              </span>
+            </div>
             <p className="text-[10px] text-slate-400 font-medium tracking-wide">Mobile Reward Ecosystem</p>
           </div>
         </div>

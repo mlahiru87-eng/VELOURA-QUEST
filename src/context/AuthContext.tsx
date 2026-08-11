@@ -364,8 +364,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
               displayName: user.displayName || user.email?.split('@')[0] || 'Quest Explorer',
               photoURL: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150&auto=format&fit=crop&q=80',
               referralCode: 'VQ-' + Math.floor(1000 + Math.random() * 9000),
-              currentBalance: 10.00,
-              totalEarned: 10.00,
+              currentBalance: 5.00,
+              totalEarned: 5.00,
               role: user.email === 'admin@veloura-quest.vercel.app' ? 'admin' : 'user',
               createdAt: new Date().toISOString(),
               hasSeenOnboarding: false,
@@ -379,7 +379,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             await addDoc(collection(db, 'transactions'), {
               userId: user.uid,
               type: 'welcome_bonus',
-              amount: 10.00,
+              amount: 5.00,
               description: 'Veloura Quest Registration Bonus',
               status: 'completed',
               createdAt: new Date().toISOString()
@@ -539,7 +539,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       const newUid = cred.user.uid;
       const generatedRefCode = 'VQ-' + Math.floor(1000 + Math.random() * 9000);
       const isFirstAdmin = email === 'admin@veloura-quest.vercel.app';
-      const initialBonus = 10.00;
+      const initialBonus = 5.00;
 
       const newProfile: UserProfile = {
         uid: newUid,

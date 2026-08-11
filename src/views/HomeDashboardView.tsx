@@ -15,7 +15,10 @@ import {
   Clock, 
   Gift,
   Zap,
-  Check
+  Check,
+  Flame,
+  Lock,
+  ShieldCheck
 } from 'lucide-react';
 
 export const HomeDashboardView: React.FC = () => {
@@ -50,6 +53,27 @@ export const HomeDashboardView: React.FC = () => {
 
   return (
     <div id="home-dashboard" className="space-y-6 pb-20 md:pb-8">
+      {/* 18+ Animated Age Verification Header Banner */}
+      <div className="relative glass-panel rounded-2xl p-3 sm:p-4 border border-rose-500/40 overflow-hidden flex flex-wrap items-center justify-between gap-3 shadow-lg">
+        <div className="absolute inset-0 bg-gradient-to-r from-rose-950/40 via-red-950/20 to-slate-950 pointer-events-none"></div>
+        <div className="relative z-10 flex items-center space-x-3">
+          <span className="px-2.5 py-1 rounded-full text-xs font-black bg-rose-600 text-white border border-rose-400 animated-18-badge flex items-center gap-1 shrink-0">
+            <Lock className="w-3.5 h-3.5" /> 18+ MATURE CONTENT
+          </span>
+          <div className="text-xs">
+            <span className="font-bold text-slate-100 flex items-center gap-1">
+              <Flame className="w-3.5 h-3.5 text-rose-400 fill-rose-500 animate-pulse" /> Verified 18+ Adult Portal
+            </span>
+            <span className="text-[10px] text-slate-400 hidden sm:inline">Must be 18 years or older to participate in daily rewarded web quests.</span>
+          </div>
+        </div>
+        <div className="relative z-10 flex items-center space-x-2">
+          <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-slate-900 text-emerald-400 border border-emerald-500/30 flex items-center gap-1">
+            <ShieldCheck className="w-3 h-3" /> Age Verified
+          </span>
+        </div>
+      </div>
+
       {/* User Welcome Profile Banner */}
       <div className="relative glass-panel rounded-3xl p-6 sm:p-8 overflow-hidden border border-rose-500/30 shadow-2xl">
         <div className="absolute top-0 right-0 w-80 h-80 bg-rose-600/20 rounded-full blur-3xl pointer-events-none"></div>
@@ -71,6 +95,9 @@ export const HomeDashboardView: React.FC = () => {
             <div>
               <div className="flex items-center space-x-2">
                 <h2 className="text-xl font-bold text-slate-100">{userProfile.displayName}</h2>
+                <span className="px-1.5 py-0.5 rounded text-[9px] font-black bg-rose-600/30 text-rose-300 border border-rose-500/40 uppercase">
+                  18+ Member
+                </span>
                 {userProfile.role === 'admin' && (
                   <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-500/20 text-amber-300 border border-amber-500/30 uppercase">
                     Admin
@@ -87,9 +114,9 @@ export const HomeDashboardView: React.FC = () => {
           <div className="flex flex-wrap gap-2 w-full md:w-auto">
             <button
               onClick={() => setCurrentPage('tasks')}
-              className="flex-1 md:flex-none px-4 py-2.5 rounded-xl electric-gradient-btn text-xs font-bold text-white shadow-md flex items-center justify-center gap-1.5"
+              className="flex-1 md:flex-none px-4 py-2.5 rounded-xl electric-gradient-btn text-xs font-bold text-white shadow-md flex items-center justify-center gap-1.5 hover:scale-105 transition-transform"
             >
-              <Sparkles className="w-4 h-4" /> Start Daily Quests
+              <Sparkles className="w-4 h-4" /> Start 18+ Quests
             </button>
             <button
               onClick={() => setCurrentPage('wallet')}
@@ -100,6 +127,7 @@ export const HomeDashboardView: React.FC = () => {
           </div>
         </div>
       </div>
+
 
       {/* Metrics Grid */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">

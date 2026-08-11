@@ -132,7 +132,7 @@ interface AuthContextType {
   logout: () => Promise<void>;
   resetPassword: (e: string) => Promise<void>;
   claimTaskReward: (taskId: string) => Promise<{ success: boolean; message: string }>;
-  startTaskSession: (taskId: string) => Promise<{ success: boolean; redirectUrl?: string; message?: string }>;
+  startTaskSession: (taskId: string) => Promise<{ success: boolean; redirectUrl?: string; sessionId?: string; message?: string }>;
   submitWithdrawalRequest: (amount: number, method: WithdrawalRequest['method'], destination: string) => Promise<{ success: boolean; message: string }>;
   markNotificationRead: (id: string) => void;
   markAllNotificationsRead: () => void;
@@ -960,7 +960,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   // External Video Task Support - Start Session
-  const startTaskSession = async (taskId: string): Promise<{ success: boolean; redirectUrl?: string; message?: string }> => {
+  const startTaskSession = async (taskId: string): Promise<{ success: boolean; redirectUrl?: string; sessionId?: string; message?: string }> => {
     if (!currentUser || !userProfile) {
       return { success: false, message: 'Please log in to start this quest' };
     }
@@ -1031,10 +1031,17 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
       const redirectUrl = targetUrl.toString();
 
-      // Do not give reward yet - user must stay on task page for 30s.
-      window.location.href = redirectUrl;
+      // Attempt to open in a new tab so user can watch while staying in app, fallback to current window location
+      try {
+        const openedWin = window.open(redirectUrl, '_blank');
+        if (!openedWin || openedWin.closed || typeof openedWin.closed === 'undefined') {
+          window.location.href = redirectUrl;
+        }
+      } catch (e) {
+        window.location.href = redirectUrl;
+      }
 
-      return { success: true, redirectUrl };
+      return { success: true, redirectUrl, sessionId };
     } catch (err) {
       handleFirestoreError(err, OperationType.WRITE, 'taskSessions');
       return { success: false, message: 'Failed to start quest session.' };

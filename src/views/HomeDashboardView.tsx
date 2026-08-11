@@ -39,7 +39,8 @@ export const HomeDashboardView: React.FC = () => {
     .filter((tc) => isTaskCompletedToday(tc.completedAt))
     .reduce((sum, tc) => sum + (tc.claimedAmount || 0), 0);
 
-  const referralLink = `https://veloura-quest.vercel.app/ref?code=${userProfile.referralCode}`;
+  const appOrigin = typeof window !== 'undefined' ? window.location.origin : 'https://veloura-quest.vercel.app';
+  const referralLink = `${appOrigin}/ref?code=${userProfile.referralCode}`;
 
   const copyReferral = () => {
     navigator.clipboard.writeText(referralLink);

@@ -13,8 +13,44 @@ export const RegisterView: React.FC = () => {
 
   useEffect(() => {
     if (typeof window !== 'undefined') {
+      let codeParam = '';
+
+      // 1. Check URL query parameters (?code=VQ-xxx or ?ref=VQ-xxx)
       const params = new URLSearchParams(window.location.search);
-      const codeParam = params.get('code') || params.get('ref');
+      codeParam = params.get('code') || params.get('ref') || '';
+
+      // 2. Check hash string if using hash routing or hash params
+      if (!codeParam && window.location.hash) {
+        const hashIndex = window.location.hash.indexOf('?');
+        if (hashIndex !== -1) {
+          const hashParams = new URLSearchParams(window.location.hash.slice(hashIndex));
+          codeParam = hashParams.get('code') || hashParams.get('ref') || '';
+        }
+      }
+
+      // 3. Check path structure like /ref/VQ-xxx or /register/VQ-xxx or /r/VQ-xxx
+      if (!codeParam) {
+        const parts = window.location.pathname.split('/').filter(Boolean);
+        if (parts.length >= 2 && (parts[0] === 'ref' || parts[0] === 'register' || parts[0] === 'r')) {
+          codeParam = parts[1];
+        }
+      }
+
+      // 4. Fallback to localStorage pending code
+      if (!codeParam) {
+        try {
+          codeParam = localStorage.getItem('pending_referral_code') || '';
+        } catch (e) {
+          // ignore
+        }
+      } else {
+        try {
+          localStorage.setItem('pending_referral_code', codeParam);
+        } catch (e) {
+          // ignore
+        }
+      }
+
       if (codeParam) {
         setReferralCode(codeParam);
       }

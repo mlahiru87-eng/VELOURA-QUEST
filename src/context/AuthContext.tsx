@@ -157,6 +157,55 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [currentUser, setCurrentUser] = useState<FirebaseUser | null>(null);
   const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
   const [loading, setLoading] = useState<boolean>(true);
+  const checkIsReferralOrRegisterUrl = (): { isRef: boolean; code: string } => {
+    if (typeof window === 'undefined') return { isRef: false, code: '' };
+
+    const path = window.location.pathname.toLowerCase();
+    const search = window.location.search;
+    const hash = window.location.hash;
+
+    const params = new URLSearchParams(search);
+    let code = params.get('code') || params.get('ref') || '';
+
+    if (!code && hash) {
+      const hashIndex = hash.indexOf('?');
+      if (hashIndex !== -1) {
+        const hashParams = new URLSearchParams(hash.slice(hashIndex));
+        code = hashParams.get('code') || hashParams.get('ref') || '';
+      }
+    }
+
+    if (!code) {
+      const parts = window.location.pathname.split('/').filter(Boolean);
+      if (parts.length >= 2 && (parts[0] === 'ref' || parts[0] === 'register' || parts[0] === 'r')) {
+        code = parts[1];
+      }
+    }
+
+    const isRef =
+      path === '/ref' ||
+      path.startsWith('/ref/') ||
+      path === '/r' ||
+      path.startsWith('/r/') ||
+      path === '/register' ||
+      path.startsWith('/register/') ||
+      search.includes('code=') ||
+      search.includes('ref=') ||
+      hash.includes('code=') ||
+      hash.includes('ref=') ||
+      Boolean(code);
+
+    if (code) {
+      try {
+        localStorage.setItem('pending_referral_code', code);
+      } catch (e) {
+        // ignore
+      }
+    }
+
+    return { isRef, code };
+  };
+
   const getInitialPage = (): PageView => {
     if (typeof window !== 'undefined') {
       const path = window.location.pathname;
@@ -164,7 +213,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       if (path === '/complete' || search.includes('taskId=') || search.includes('sessionId=')) {
         return 'complete';
       }
-      if (path === '/ref' || path === '/register' || search.includes('code=') || search.includes('ref=')) {
+      const { isRef } = checkIsReferralOrRegisterUrl();
+      if (isRef) {
         return 'register';
       }
     }
@@ -326,8 +376,16 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       if (typeof window !== 'undefined') {
         const path = window.location.pathname;
         const search = window.location.search;
+        const { isRef } = checkIsReferralOrRegisterUrl();
+
         if (path === '/complete' || search.includes('taskId=') || search.includes('sessionId=')) {
           setCurrentPage('complete');
+        } else if (isRef) {
+          if (!user) {
+            setCurrentPage('register');
+          } else {
+            setCurrentPage('home');
+          }
         } else if (user && (currentPage === 'splash' || currentPage === 'login' || currentPage === 'register')) {
           setCurrentPage('home');
         }

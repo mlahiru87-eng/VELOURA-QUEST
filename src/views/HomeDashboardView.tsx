@@ -51,9 +51,9 @@ export const HomeDashboardView: React.FC = () => {
   return (
     <div id="home-dashboard" className="space-y-6 pb-20 md:pb-8">
       {/* User Welcome Profile Banner */}
-      <div className="relative glass-panel rounded-3xl p-6 sm:p-8 overflow-hidden border border-purple-500/30 shadow-2xl">
-        <div className="absolute top-0 right-0 w-80 h-80 bg-purple-600/15 rounded-full blur-3xl pointer-events-none"></div>
-        <div className="absolute bottom-0 left-0 w-80 h-80 bg-blue-600/15 rounded-full blur-3xl pointer-events-none"></div>
+      <div className="relative glass-panel rounded-3xl p-6 sm:p-8 overflow-hidden border border-rose-500/30 shadow-2xl">
+        <div className="absolute top-0 right-0 w-80 h-80 bg-rose-600/20 rounded-full blur-3xl pointer-events-none"></div>
+        <div className="absolute bottom-0 left-0 w-80 h-80 bg-red-600/15 rounded-full blur-3xl pointer-events-none"></div>
 
         <div className="relative z-10 flex flex-col md:flex-row items-start md:items-center justify-between gap-6">
           <div className="flex items-center space-x-4">
@@ -61,9 +61,9 @@ export const HomeDashboardView: React.FC = () => {
               <img
                 src={userProfile.photoURL || "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150&auto=format&fit=crop&q=80"}
                 alt="Avatar"
-                className="w-16 h-16 rounded-2xl object-cover border-2 border-purple-400/50 glow-purple shadow-lg"
+                className="w-16 h-16 rounded-2xl object-cover border-2 border-rose-500/50 glow-red shadow-lg"
               />
-              <span className="absolute -bottom-1 -right-1 p-1 rounded-md bg-purple-600 text-white shadow-md">
+              <span className="absolute -bottom-1 -right-1 p-1 rounded-md bg-rose-600 text-white shadow-md">
                 <Zap className="w-3.5 h-3.5 fill-white" />
               </span>
             </div>
@@ -79,7 +79,7 @@ export const HomeDashboardView: React.FC = () => {
               </div>
               <p className="text-xs text-slate-400 mt-1">
                 Referral Code:{' '}
-                <span className="font-mono font-bold text-purple-300">{userProfile.referralCode}</span>
+                <span className="font-mono font-bold text-rose-300">{userProfile.referralCode}</span>
               </p>
             </div>
           </div>

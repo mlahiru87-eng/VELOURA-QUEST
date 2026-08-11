@@ -213,6 +213,22 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       if (path === '/complete' || search.includes('taskId=') || search.includes('sessionId=')) {
         return 'complete';
       }
+
+      // Check for active pending task session in localStorage
+      try {
+        const pendingSession = localStorage.getItem('active_task_session');
+        if (pendingSession) {
+          const parsed = JSON.parse(pendingSession);
+          if (parsed && parsed.taskId && parsed.sessionId) {
+            localStorage.removeItem('active_task_session');
+            window.history.replaceState(null, '', `/complete?taskId=${parsed.taskId}&sessionId=${parsed.sessionId}`);
+            return 'complete';
+          }
+        }
+      } catch (e) {
+        // ignore storage parse errors
+      }
+
       const { isRef } = checkIsReferralOrRegisterUrl();
       if (isRef) {
         return 'register';
@@ -1015,6 +1031,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
       await setDoc(sessionRef, sessionPayload);
       telemetry.recordFirestoreWrite();
+
+      // Store in localStorage so if the user hits Back or reopens, we resume session verification
+      try {
+        localStorage.setItem('active_task_session', JSON.stringify({ taskId, sessionId, startedAt: Date.now() }));
+      } catch (e) {
+        // ignore
+      }
 
       // 4. Redirect the user to videoUrl with query params appended
       let targetUrl: URL;

@@ -101,17 +101,17 @@ export const TaskExecutionModal: React.FC<TaskExecutionModalProps> = ({ task, on
   const rewardVal = task.reward ?? task.rewardAmount ?? 5.00;
 
   return (
-    <div id="task-modal-overlay" className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-md animate-fade-in">
-      <div className="relative w-full max-w-lg glass-panel rounded-3xl p-6 sm:p-8 border border-purple-500/30 shadow-2xl space-y-6 overflow-hidden">
+    <div id="task-modal-overlay" className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/85 backdrop-blur-md animate-fade-in">
+      <div className="relative w-full max-w-lg glass-panel rounded-3xl p-6 sm:p-8 border border-rose-500/40 shadow-2xl space-y-6 overflow-hidden">
         {/* Glow ambient background elements */}
-        <div className="absolute -top-20 -right-20 w-40 h-40 bg-purple-600/20 rounded-full blur-3xl pointer-events-none"></div>
-        <div className="absolute -bottom-20 -left-20 w-40 h-40 bg-blue-600/20 rounded-full blur-3xl pointer-events-none"></div>
+        <div className="absolute -top-20 -right-20 w-40 h-40 bg-rose-600/25 rounded-full blur-3xl pointer-events-none"></div>
+        <div className="absolute -bottom-20 -left-20 w-40 h-40 bg-red-600/20 rounded-full blur-3xl pointer-events-none"></div>
 
         {/* Modal Header */}
         <div className="flex items-start justify-between relative z-10">
           <div>
-            <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-purple-500/20 text-purple-300 border border-purple-500/30">
-              <Sparkles className="w-3.5 h-3.5 text-purple-400" />
+            <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-rose-500/20 text-rose-300 border border-rose-500/30">
+              <Sparkles className="w-3.5 h-3.5 text-rose-400" />
               {task.category} Quest
             </span>
             <h3 className="text-xl font-bold text-slate-100 mt-2">{task.title}</h3>
@@ -171,9 +171,9 @@ export const TaskExecutionModal: React.FC<TaskExecutionModalProps> = ({ task, on
               {/* 1. INITIAL UNSTARTED STATE */}
               {!timerRunning && !timerFinished && (
                 <>
-                  <div className="p-3.5 rounded-2xl bg-slate-900/90 border border-purple-500/20 text-xs text-slate-300 space-y-1">
-                    <div className="flex items-center gap-1.5 font-bold text-purple-300">
-                      <Clock className="w-4 h-4 text-purple-400" />
+                  <div className="p-3.5 rounded-2xl bg-slate-900/90 border border-rose-500/30 text-xs text-slate-300 space-y-1">
+                    <div className="flex items-center gap-1.5 font-bold text-rose-300">
+                      <Clock className="w-4 h-4 text-rose-400" />
                       <span>30-Second Task Visit Required</span>
                     </div>
                     <p className="text-[11px] text-slate-400 leading-relaxed">
@@ -195,10 +195,10 @@ export const TaskExecutionModal: React.FC<TaskExecutionModalProps> = ({ task, on
               {/* 2. ACTIVE 30-SECOND COUNTDOWN TIMER */}
               {timerRunning && (
                 <div className="space-y-3">
-                  <div className="p-4 rounded-2xl bg-purple-950/40 border border-purple-500/30 space-y-3">
-                    <div className="flex items-center justify-between text-xs font-bold text-purple-200">
+                  <div className="p-4 rounded-2xl bg-rose-950/40 border border-rose-500/40 space-y-3">
+                    <div className="flex items-center justify-between text-xs font-bold text-rose-200">
                       <span className="flex items-center gap-1.5">
-                        <Clock className="w-4 h-4 text-purple-400 animate-spin" />
+                        <Clock className="w-4 h-4 text-rose-400 animate-spin" />
                         <span>30s Countdown Running...</span>
                       </span>
                       <span className="text-amber-400 font-mono text-sm">{timeLeft}s remaining</span>
@@ -207,7 +207,7 @@ export const TaskExecutionModal: React.FC<TaskExecutionModalProps> = ({ task, on
                     {/* Progress Bar */}
                     <div className="w-full h-3 rounded-full bg-slate-900 overflow-hidden border border-slate-800">
                       <div
-                        className="h-full bg-gradient-to-r from-purple-500 via-indigo-500 to-emerald-400 transition-all duration-1000 ease-linear"
+                        className="h-full bg-gradient-to-r from-red-600 via-rose-500 to-amber-400 transition-all duration-1000 ease-linear"
                         style={{ width: `${((30 - timeLeft) / 30) * 100}%` }}
                       ></div>
                     </div>

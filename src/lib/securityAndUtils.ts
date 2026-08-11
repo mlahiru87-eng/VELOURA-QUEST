@@ -52,6 +52,26 @@ export const recordLoginAttempt = (email: string, success: boolean): { allowed: 
 };
 
 /**
+ * Validates whether a given string is a plausible TRC20 wallet address.
+ * TRC20 addresses start with 'T', are 34 characters long, and use Base58 characters.
+ */
+export const isValidTRC20Address = (address: string): boolean => {
+  if (!address) return false;
+  const trimmed = address.trim();
+  return /^T[1-9A-HJ-NP-Za-km-z]{33}$/.test(trimmed) || /^T[a-zA-Z0-9]{33}$/.test(trimmed);
+};
+
+/**
+ * Masks a wallet address for privacy in UI: TAbc••••••••••••••••XYZ123
+ */
+export const maskWalletAddress = (address: string): string => {
+  if (!address) return '';
+  const trimmed = address.trim();
+  if (trimmed.length <= 10) return trimmed;
+  return `${trimmed.slice(0, 4)}••••••••••••••••${trimmed.slice(-6)}`;
+};
+
+/**
  * Analyzes user history to flag suspicious activities like rapid task completions or withdrawal spamming.
  */
 export const evaluateSuspiciousActivity = (
@@ -106,16 +126,19 @@ export const exportUsersCSV = (users: UserProfile[]) => {
 };
 
 export const exportWithdrawalsCSV = (withdrawals: WithdrawalRequest[]) => {
-  const headers = ['Request ID', 'User ID', 'User Email', 'Amount ($)', 'Method', 'Destination', 'Status', 'Requested At'];
+  const headers = ['Request ID', 'User ID', 'User Email', 'Amount ($)', 'Currency', 'Network', 'Wallet Address', 'Status', 'TXID', 'Requested At', 'Processed At'];
   const rows = withdrawals.map((w) => [
     `"${w.id}"`,
     `"${w.userId}"`,
-    `"${w.userEmail}"`,
+    `"${w.userEmail || ''}"`,
     w.amount.toFixed(2),
-    `"${w.method}"`,
-    `"${w.destination}"`,
+    `"${w.currency || 'USDT'}"`,
+    `"${w.network || 'TRC20'}"`,
+    `"${w.walletAddress || w.destination || ''}"`,
     `"${w.status}"`,
-    `"${new Date(w.createdAt).toISOString()}"`
+    `"${w.txHash || ''}"`,
+    `"${new Date(w.createdAt).toISOString()}"`,
+    `"${w.processedAt ? new Date(w.processedAt).toISOString() : ''}"`
   ]);
 
   const csvContent = [headers.join(','), ...rows.map((r) => r.join(','))].join('\n');

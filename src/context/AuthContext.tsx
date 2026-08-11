@@ -19,7 +19,8 @@ import {
   where,
   onSnapshot,
   getDocFromServer,
-  serverTimestamp
+  serverTimestamp,
+  runTransaction
 } from 'firebase/firestore';
 import { auth, db } from '../lib/firebase';
 import { 
@@ -35,7 +36,7 @@ import {
   AuditLog
 } from '../types';
 import { INITIAL_TASKS, INITIAL_NOTIFICATIONS, DEFAULT_SETTINGS } from '../data/initialData';
-import { checkClaimRateLimit, recordLoginAttempt, evaluateSuspiciousActivity } from '../lib/securityAndUtils';
+import { checkClaimRateLimit, recordLoginAttempt, evaluateSuspiciousActivity, isValidTRC20Address, maskWalletAddress } from '../lib/securityAndUtils';
 import { telemetry } from '../lib/telemetry';
 
 export enum OperationType {
@@ -133,7 +134,9 @@ interface AuthContextType {
   resetPassword: (e: string) => Promise<void>;
   claimTaskReward: (taskId: string) => Promise<{ success: boolean; message: string }>;
   startTaskSession: (taskId: string) => Promise<{ success: boolean; redirectUrl?: string; sessionId?: string; message?: string }>;
-  submitWithdrawalRequest: (amount: number, method: WithdrawalRequest['method'], destination: string) => Promise<{ success: boolean; message: string }>;
+  submitWithdrawalRequest: (amount: number, walletAddress: string) => Promise<{ success: boolean; message: string; withdrawalId?: string }>;
+  approveWithdrawal: (id: string, txHash: string, adminNote?: string) => Promise<{ success: boolean; message: string }>;
+  rejectWithdrawal: (id: string, rejectionReason: string, adminNote?: string) => Promise<{ success: boolean; message: string }>;
   markNotificationRead: (id: string) => void;
   markAllNotificationsRead: () => void;
   updateUserProfileData: (displayName: string, photoURL?: string) => Promise<void>;
@@ -143,7 +146,7 @@ interface AuthContextType {
   addNewTask: (task: Omit<TaskItem, 'id'>) => Promise<void>;
   updateTaskItem: (task: TaskItem) => Promise<void>;
   deleteTaskItem: (taskId: string) => Promise<void>;
-  updateWithdrawalStatus: (id: string, status: 'approved' | 'rejected') => Promise<void>;
+  updateWithdrawalStatus: (id: string, status: 'approved' | 'rejected', txHashOrReason?: string, adminNote?: string) => Promise<void>;
   sendAnnouncement: (title: string, message: string) => Promise<void>;
   updateSystemSettings: (newSettings: SystemSettings) => Promise<void>;
   performManualWalletAdjustment: (targetUserId: string, amount: number, reason: string) => Promise<{ success: boolean; message: string }>;
@@ -843,9 +846,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   // Submit Withdrawal Request
   const submitWithdrawalRequest = async (
     amount: number, 
-    method: WithdrawalRequest['method'], 
-    destination: string
-  ) => {
+    walletAddress: string
+  ): Promise<{ success: boolean; message: string; withdrawalId?: string }> => {
     if (!userProfile) return { success: false, message: 'Please log in first' };
 
     if (userProfile.isFlagged) {
@@ -855,12 +857,40 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       };
     }
 
-    if (amount < settings.minWithdrawal) {
-      return { success: false, message: `Minimum withdrawal amount is $${settings.minWithdrawal.toFixed(2)}` };
+    if (userProfile.isSuspended) {
+      return {
+        success: false,
+        message: 'Your account is suspended. Withdrawals are disabled.'
+      };
     }
 
-    if (amount > userProfile.currentBalance) {
-      return { success: false, message: 'Insufficient wallet balance' };
+    const minAmount = Math.max(20.00, settings?.minWithdrawal || 20.00);
+    if (amount < minAmount) {
+      return { success: false, message: 'Minimum withdrawal amount is 20 USDT.' };
+    }
+
+    if (amount <= 0) {
+      return { success: false, message: 'Withdrawal amount must be greater than $0.00' };
+    }
+
+    if (!walletAddress || !walletAddress.trim()) {
+      return { success: false, message: 'USDT TRC20 Wallet Address is required' };
+    }
+
+    if (!isValidTRC20Address(walletAddress)) {
+      return { 
+        success: false, 
+        message: 'Invalid TRC20 Wallet Address. Address must start with "T" and be 34 characters long.' 
+      };
+    }
+
+    // Check duplicate pending request
+    const existingPending = withdrawals.find(w => w.status === 'pending');
+    if (existingPending) {
+      return {
+        success: false,
+        message: 'You already have a pending withdrawal request under review. Please wait until it is processed.'
+      };
     }
 
     // Check suspicious withdrawal frequency
@@ -886,52 +916,127 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
 
     try {
-      const newBalance = userProfile.currentBalance - amount;
+      const cleanAddress = walletAddress.trim();
+      const maskedAddr = maskWalletAddress(cleanAddress);
+      let createdWithdrawalId = '';
 
-      const newRequest: Omit<WithdrawalRequest, 'id'> = {
-        userId: userProfile.uid,
-        userEmail: userProfile.email,
-        amount,
-        method,
-        destination,
-        status: 'pending',
-        createdAt: new Date().toISOString()
-      };
-      const wRef = await addDoc(collection(db, 'withdrawals'), newRequest);
+      // Perform atomic Firestore transaction to verify balance and deduct
+      await runTransaction(db, async (transaction) => {
+        const userRef = doc(db, 'users', userProfile.uid);
+        const userSnap = await transaction.get(userRef);
 
-      await addDoc(collection(db, 'transactions'), {
-        userId: userProfile.uid,
-        type: 'withdrawal',
-        amount: -amount,
-        description: `Withdrawal Request (${method} - ${destination})`,
-        status: 'pending',
-        createdAt: new Date().toISOString()
+        if (!userSnap.exists()) {
+          throw new Error('User profile not found in database.');
+        }
+
+        const serverUserData = userSnap.data() as UserProfile;
+        const currentBal = serverUserData.currentBalance ?? 0;
+
+        if (currentBal < amount) {
+          throw new Error(`Insufficient wallet balance. Available balance: $${currentBal.toFixed(2)}`);
+        }
+
+        const newBalance = currentBal - amount;
+
+        // Create withdrawal doc reference
+        const wDocRef = doc(collection(db, 'withdrawals'));
+        createdWithdrawalId = wDocRef.id;
+
+        const newWithdrawalData: WithdrawalRequest = {
+          id: wDocRef.id,
+          withdrawalId: wDocRef.id,
+          userId: userProfile.uid,
+          userEmail: userProfile.email || '',
+          userName: userProfile.displayName || '',
+          amount,
+          currency: 'USDT',
+          network: 'TRC20',
+          walletAddress: cleanAddress,
+          status: 'pending',
+          createdAt: new Date().toISOString(),
+          processedAt: null,
+          processedBy: null,
+          adminNote: null,
+          txHash: null,
+          rejectionReason: null,
+          method: 'Crypto (USDT)',
+          destination: cleanAddress
+        };
+
+        // Create transaction record
+        const txDocRef = doc(collection(db, 'transactions'));
+        const newTransactionData: TransactionRecord = {
+          id: txDocRef.id,
+          userId: userProfile.uid,
+          type: 'withdrawal',
+          amount: -amount,
+          currency: 'USDT',
+          network: 'TRC20',
+          withdrawalId: wDocRef.id,
+          description: `Withdrawal Request ($${amount.toFixed(2)} USDT TRC20 - ${maskedAddr})`,
+          status: 'pending',
+          createdAt: new Date().toISOString()
+        };
+
+        // Set withdrawal and transaction docs atomically
+        transaction.set(wDocRef, newWithdrawalData);
+        transaction.set(txDocRef, newTransactionData);
+
+        // Update user balance atomically
+        transaction.update(userRef, {
+          currentBalance: newBalance
+        });
       });
 
-      await updateDoc(doc(db, 'users', userProfile.uid), {
-        currentBalance: newBalance
-      });
-
+      // Update local React state
+      const updatedBalance = userProfile.currentBalance - amount;
       setUserProfile({
         ...userProfile,
-        currentBalance: newBalance
+        currentBalance: updatedBalance
       });
 
-      setWithdrawals([{ id: wRef.id, ...newRequest }, ...withdrawals]);
+      const newWithdrawalObj: WithdrawalRequest = {
+        id: createdWithdrawalId,
+        withdrawalId: createdWithdrawalId,
+        userId: userProfile.uid,
+        userEmail: userProfile.email || '',
+        userName: userProfile.displayName || '',
+        amount,
+        currency: 'USDT',
+        network: 'TRC20',
+        walletAddress: cleanAddress,
+        status: 'pending',
+        createdAt: new Date().toISOString(),
+        processedAt: null,
+        processedBy: null,
+        adminNote: null,
+        txHash: null,
+        rejectionReason: null,
+        method: 'Crypto (USDT)',
+        destination: cleanAddress
+      };
 
+      setWithdrawals([newWithdrawalObj, ...withdrawals]);
+
+      // Add notification for user
       await addDoc(collection(db, 'notifications'), {
         userId: userProfile.uid,
         title: 'Withdrawal Request Submitted',
-        message: `Your request to withdraw $${amount.toFixed(2)} via ${method} is being processed.`,
+        message: `Your request to withdraw $${amount.toFixed(2)} USDT (TRC20) has been submitted. An administrator will review and process your payout.`,
         type: 'withdrawal',
         read: false,
         createdAt: new Date().toISOString()
       });
 
-      return { success: true, message: 'Withdrawal request submitted successfully!' };
-    } catch (err) {
+      return {
+        success: true,
+        message: 'Your withdrawal request has been submitted. An administrator will review and process your payout.',
+        withdrawalId: createdWithdrawalId
+      };
+    } catch (err: any) {
+      const errMsg = err?.message || 'Failed to submit withdrawal request. Please try again.';
       handleFirestoreError(err, OperationType.WRITE, 'withdrawals');
-      return { success: false, message: 'Failed to submit withdrawal request. Please try again.' };
+      return { success: false, message: errMsg };
     }
   };
 
@@ -1079,7 +1184,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   }) => {
     try {
       const createdAt = (taskData as any).createdAt || new Date().toISOString();
-      const reward = (taskData as any).reward !== undefined ? (taskData as any).reward : (taskData as any).rewardAmount;
+      const rewardRaw = (taskData as any).reward !== undefined ? (taskData as any).reward : (taskData as any).rewardAmount;
+      const reward = typeof rewardRaw === 'number' ? rewardRaw : parseFloat(rewardRaw);
+      
+      if (isNaN(reward) || reward < 0.01) {
+        throw new Error("Minimum task reward is 0.01 USDT.");
+      }
+
       const thumbnailUrl = (taskData as any).thumbnailUrl || (taskData as any).thumbnail;
       const duration = (taskData as any).duration !== undefined ? (taskData as any).duration : (taskData as any).durationSeconds;
 
@@ -1113,6 +1224,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const updateTaskItem = async (task: TaskItem) => {
     try {
+      const rewardRaw = task.reward !== undefined ? task.reward : task.rewardAmount;
+      const reward = typeof rewardRaw === 'number' ? rewardRaw : parseFloat(rewardRaw as any);
+      if (isNaN(reward) || reward < 0.01) {
+        throw new Error("Minimum task reward is 0.01 USDT.");
+      }
+
       await setDoc(doc(db, 'tasks', task.id), task);
       setTasks(tasks.map(t => t.id === task.id ? task : t));
     } catch (err) {
@@ -1129,59 +1246,229 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   };
 
-  const updateWithdrawalStatus = async (id: string, status: 'approved' | 'rejected') => {
-    if (!userProfile || userProfile.role !== 'admin') return;
+  const approveWithdrawal = async (
+    id: string, 
+    txHash: string, 
+    adminNote?: string
+  ): Promise<{ success: boolean; message: string }> => {
+    if (!userProfile || userProfile.role !== 'admin') {
+      return { success: false, message: 'Unauthorized action' };
+    }
+
+    if (!txHash || !txHash.trim()) {
+      return { success: false, message: 'Transaction Hash / TXID is required for payout confirmation' };
+    }
 
     try {
-      await updateDoc(doc(db, 'withdrawals', id), { status });
-      setAllWithdrawals(allWithdrawals.map(w => w.id === id ? { ...w, status } : w));
+      const cleanTxHash = txHash.trim();
+      const cleanNote = adminNote ? adminNote.trim() : '';
 
-      const targetW = allWithdrawals.find(w => w.id === id);
-      if (targetW) {
-        if (status === 'rejected') {
-          const uSnap = await getDoc(doc(db, 'users', targetW.userId));
-          if (uSnap.exists()) {
-            const uData = uSnap.data() as UserProfile;
-            const refundedBalance = uData.currentBalance + targetW.amount;
-            await updateDoc(doc(db, 'users', targetW.userId), {
-              currentBalance: refundedBalance
-            });
+      await runTransaction(db, async (transaction) => {
+        const wRef = doc(db, 'withdrawals', id);
+        const wSnap = await transaction.get(wRef);
 
-            await addDoc(collection(db, 'transactions'), {
-              userId: targetW.userId,
-              type: 'withdrawal_refund',
-              amount: targetW.amount,
-              description: `Withdrawal Refund ($${targetW.amount.toFixed(2)} via ${targetW.method})`,
-              status: 'completed',
-              createdAt: new Date().toISOString()
-            });
-          }
+        if (!wSnap.exists()) {
+          throw new Error('Withdrawal request document not found');
         }
 
-        // Add audit log
-        await addDoc(collection(db, 'auditLogs'), {
-          adminUid: userProfile.uid,
-          adminEmail: userProfile.email,
-          targetUserId: targetW.userId,
-          targetUserEmail: targetW.userEmail,
-          action: 'withdrawal_override',
-          reason: `Withdrawal ${id} status set to ${status}`,
-          createdAt: new Date().toISOString()
+        const wData = wSnap.data() as WithdrawalRequest;
+        if (wData.status !== 'pending') {
+          throw new Error(`Cannot approve. Withdrawal request is already ${wData.status}.`);
+        }
+
+        // Update withdrawal doc
+        transaction.update(wRef, {
+          status: 'approved',
+          processedAt: new Date().toISOString(),
+          processedBy: userProfile.uid,
+          txHash: cleanTxHash,
+          adminNote: cleanNote
         });
 
+        // Add completed transaction record
+        const txRef = doc(collection(db, 'transactions'));
+        transaction.set(txRef, {
+          userId: wData.userId,
+          type: 'withdrawal',
+          amount: -wData.amount,
+          currency: 'USDT',
+          network: 'TRC20',
+          withdrawalId: id,
+          txHash: cleanTxHash,
+          description: `Withdrawal Paid - TXID: ${cleanTxHash.slice(0, 10)}...`,
+          status: 'completed',
+          createdAt: new Date().toISOString()
+        });
+      });
+
+      // Local state updates
+      setAllWithdrawals(allWithdrawals.map(w => w.id === id ? {
+        ...w,
+        status: 'approved',
+        processedAt: new Date().toISOString(),
+        processedBy: userProfile.uid,
+        txHash: cleanTxHash,
+        adminNote: cleanNote
+      } : w));
+
+      const targetW = allWithdrawals.find(w => w.id === id);
+      const targetUserId = targetW ? targetW.userId : '';
+      const targetUserEmail = targetW ? targetW.userEmail : '';
+      const targetAmount = targetW ? targetW.amount : 0;
+
+      // Add audit log
+      await addDoc(collection(db, 'auditLogs'), {
+        adminUid: userProfile.uid,
+        adminEmail: userProfile.email,
+        targetUserId,
+        targetUserEmail,
+        action: 'withdrawal_override',
+        reason: `Approved withdrawal ${id} ($${targetAmount.toFixed(2)} USDT TRC20). TXID: ${cleanTxHash}`,
+        createdAt: new Date().toISOString()
+      });
+
+      // Send user notification
+      if (targetUserId) {
         await addDoc(collection(db, 'notifications'), {
-          userId: targetW.userId,
-          title: `Withdrawal ${status === 'approved' ? 'Approved' : 'Rejected'}`,
-          message: status === 'approved' 
-            ? `Your withdrawal request of $${targetW.amount.toFixed(2)} via ${targetW.method} was approved and disbursed.`
-            : `Your withdrawal request of $${targetW.amount.toFixed(2)} was rejected. $${targetW.amount.toFixed(2)} has been refunded to your wallet balance.`,
+          userId: targetUserId,
+          title: 'Withdrawal Approved & Paid',
+          message: `Your withdrawal request of $${targetAmount.toFixed(2)} USDT (TRC20) has been processed and paid! TXID: ${cleanTxHash}`,
           type: 'withdrawal',
           read: false,
           createdAt: new Date().toISOString()
         });
       }
-    } catch (err) {
+
+      return { success: true, message: 'Withdrawal request marked as paid and approved!' };
+    } catch (err: any) {
       handleFirestoreError(err, OperationType.UPDATE, `withdrawals/${id}`);
+      return { success: false, message: err?.message || 'Failed to approve withdrawal' };
+    }
+  };
+
+  const rejectWithdrawal = async (
+    id: string, 
+    rejectionReason: string, 
+    adminNote?: string
+  ): Promise<{ success: boolean; message: string }> => {
+    if (!userProfile || userProfile.role !== 'admin') {
+      return { success: false, message: 'Unauthorized action' };
+    }
+
+    if (!rejectionReason || !rejectionReason.trim()) {
+      return { success: false, message: 'Rejection reason is required' };
+    }
+
+    try {
+      const cleanReason = rejectionReason.trim();
+      const cleanNote = adminNote ? adminNote.trim() : '';
+
+      await runTransaction(db, async (transaction) => {
+        const wRef = doc(db, 'withdrawals', id);
+        const wSnap = await transaction.get(wRef);
+
+        if (!wSnap.exists()) {
+          throw new Error('Withdrawal request document not found');
+        }
+
+        const wData = wSnap.data() as WithdrawalRequest;
+        if (wData.status !== 'pending') {
+          throw new Error(`Cannot reject. Withdrawal request is already ${wData.status}.`);
+        }
+
+        const uRef = doc(db, 'users', wData.userId);
+        const uSnap = await transaction.get(uRef);
+
+        if (uSnap.exists()) {
+          const uData = uSnap.data() as UserProfile;
+          const currentBal = uData.currentBalance ?? 0;
+          const refundedBalance = currentBal + wData.amount;
+
+          // Refund balance to user
+          transaction.update(uRef, {
+            currentBalance: refundedBalance
+          });
+
+          // Create withdrawal_refund transaction record
+          const txRef = doc(collection(db, 'transactions'));
+          transaction.set(txRef, {
+            userId: wData.userId,
+            type: 'withdrawal_refund',
+            amount: wData.amount,
+            currency: 'USDT',
+            network: 'TRC20',
+            withdrawalId: id,
+            description: `Withdrawal Refund: ${cleanReason}`,
+            status: 'completed',
+            createdAt: new Date().toISOString()
+          });
+        }
+
+        // Update withdrawal doc to rejected
+        transaction.update(wRef, {
+          status: 'rejected',
+          processedAt: new Date().toISOString(),
+          processedBy: userProfile.uid,
+          rejectionReason: cleanReason,
+          adminNote: cleanNote
+        });
+      });
+
+      // Update local state
+      setAllWithdrawals(allWithdrawals.map(w => w.id === id ? {
+        ...w,
+        status: 'rejected',
+        processedAt: new Date().toISOString(),
+        processedBy: userProfile.uid,
+        rejectionReason: cleanReason,
+        adminNote: cleanNote
+      } : w));
+
+      const targetW = allWithdrawals.find(w => w.id === id);
+      const targetUserId = targetW ? targetW.userId : '';
+      const targetUserEmail = targetW ? targetW.userEmail : '';
+      const targetAmount = targetW ? targetW.amount : 0;
+
+      // Add audit log
+      await addDoc(collection(db, 'auditLogs'), {
+        adminUid: userProfile.uid,
+        adminEmail: userProfile.email,
+        targetUserId,
+        targetUserEmail,
+        action: 'withdrawal_override',
+        reason: `Rejected withdrawal ${id} ($${targetAmount.toFixed(2)} USDT TRC20). Reason: ${cleanReason}`,
+        createdAt: new Date().toISOString()
+      });
+
+      // Send user notification
+      if (targetUserId) {
+        await addDoc(collection(db, 'notifications'), {
+          userId: targetUserId,
+          title: 'Withdrawal Request Rejected',
+          message: `Your withdrawal request was rejected and the amount has been refunded to your wallet. Reason: ${cleanReason}`,
+          type: 'withdrawal',
+          read: false,
+          createdAt: new Date().toISOString()
+        });
+      }
+
+      return { success: true, message: 'Withdrawal rejected and funds refunded to user balance.' };
+    } catch (err: any) {
+      handleFirestoreError(err, OperationType.UPDATE, `withdrawals/${id}`);
+      return { success: false, message: err?.message || 'Failed to reject withdrawal' };
+    }
+  };
+
+  const updateWithdrawalStatus = async (
+    id: string, 
+    status: 'approved' | 'rejected',
+    txHashOrReason?: string,
+    adminNote?: string
+  ) => {
+    if (status === 'approved') {
+      await approveWithdrawal(id, txHashOrReason || 'TXID_MANUAL_APPROVE', adminNote);
+    } else {
+      await rejectWithdrawal(id, txHashOrReason || 'Administrative decision', adminNote);
     }
   };
 
@@ -1355,6 +1642,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       claimTaskReward,
       startTaskSession,
       submitWithdrawalRequest,
+      approveWithdrawal,
+      rejectWithdrawal,
       markNotificationRead,
       markAllNotificationsRead,
       updateUserProfileData,

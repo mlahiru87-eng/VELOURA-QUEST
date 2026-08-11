@@ -109,7 +109,7 @@ export const INITIAL_NOTIFICATIONS: NotificationItem[] = [
 ];
 
 export const DEFAULT_SETTINGS: SystemSettings = {
-  minWithdrawal: 10.0,
+  minWithdrawal: 20.0,
   referralBonus: 5.0,
   maintenanceMode: false,
   announcementBanner: {

@@ -71,6 +71,10 @@ export interface TransactionRecord {
   userId: string;
   type: 'task_reward' | 'withdrawal' | 'withdrawal_refund' | 'referral_bonus' | 'welcome_bonus' | 'admin_adjustment';
   amount: number;
+  currency?: 'USDT';
+  network?: 'TRC20';
+  withdrawalId?: string;
+  txHash?: string;
   description: string;
   status: 'completed' | 'pending' | 'rejected';
   createdAt: string;
@@ -85,13 +89,24 @@ export interface WalletRecord {
 
 export interface WithdrawalRequest {
   id: string;
+  withdrawalId?: string;
   userId: string;
   userEmail: string;
+  userName?: string;
   amount: number;
-  method: 'PayPal' | 'Crypto (USDT)' | 'Bank Transfer' | 'Amazon Gift Card';
-  destination: string;
+  currency: 'USDT';
+  network: 'TRC20';
+  walletAddress: string;
   status: 'pending' | 'approved' | 'rejected';
   createdAt: string;
+  processedAt?: string | null;
+  processedBy?: string | null;
+  adminNote?: string | null;
+  txHash?: string | null;
+  rejectionReason?: string | null;
+  // Legacy aliases for backward compatibility if needed
+  method?: string;
+  destination?: string;
 }
 
 export interface ReferralRecord {

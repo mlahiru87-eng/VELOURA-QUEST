@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { useToast } from '../context/ToastContext';
-import { TaskItem, UserProfile, SystemSettings } from '../types';
+import { TaskItem, UserProfile, SystemSettings, WithdrawalRequest } from '../types';
 import { AnalyticsDashboard } from '../components/AnalyticsDashboard';
 import { UserTimelineModal } from '../components/UserTimelineModal';
 import { WalletAdjustmentModal } from '../components/WalletAdjustmentModal';
@@ -28,7 +28,12 @@ import {
   Flag,
   ShieldCheck,
   FileText,
-  Sparkles
+  Sparkles,
+  Copy,
+  ExternalLink,
+  CheckCircle2,
+  AlertTriangle,
+  Lock
 } from 'lucide-react';
 
 export const AdminPanelView: React.FC = () => {
@@ -43,6 +48,8 @@ export const AdminPanelView: React.FC = () => {
     addNewTask, 
     deleteTaskItem, 
     updateWithdrawalStatus, 
+    approveWithdrawal,
+    rejectWithdrawal,
     sendAnnouncement, 
     updateSystemSettings,
     toggleUserFlagStatus,
@@ -60,6 +67,15 @@ export const AdminPanelView: React.FC = () => {
   // Search & Filter state for withdrawals
   const [withdrawalSearch, setWithdrawalSearch] = useState('');
   const [withdrawalFilter, setWithdrawalFilter] = useState<'all' | 'pending' | 'approved' | 'rejected'>('all');
+
+  // Withdrawal Action Modal States
+  const [selectedWithdrawalForApprove, setSelectedWithdrawalForApprove] = useState<WithdrawalRequest | null>(null);
+  const [selectedWithdrawalForReject, setSelectedWithdrawalForReject] = useState<WithdrawalRequest | null>(null);
+  const [txHashInput, setTxHashInput] = useState('');
+  const [rejectionReasonInput, setRejectionReasonInput] = useState('');
+  const [adminNoteInput, setAdminNoteInput] = useState('');
+  const [isActionSubmitting, setIsActionSubmitting] = useState(false);
+  const [copiedAddrId, setCopiedAddrId] = useState<string | null>(null);
 
   // Modals state
   const [timelineUser, setTimelineUser] = useState<UserProfile | null>(null);
@@ -240,13 +256,68 @@ export const AdminPanelView: React.FC = () => {
 
   // Filtered Withdrawals
   const filteredWithdrawals = allWithdrawals.filter((w) => {
-    const matchesSearch = w.userEmail.toLowerCase().includes(withdrawalSearch.toLowerCase()) ||
-                          w.method.toLowerCase().includes(withdrawalSearch.toLowerCase()) ||
-                          w.destination.toLowerCase().includes(withdrawalSearch.toLowerCase());
+    const searchLower = withdrawalSearch.toLowerCase();
+    const addr = w.walletAddress || w.destination || '';
+    const email = w.userEmail || '';
+    const name = w.userName || '';
+    const matchesSearch = email.toLowerCase().includes(searchLower) ||
+                          name.toLowerCase().includes(searchLower) ||
+                          addr.toLowerCase().includes(searchLower) ||
+                          (w.currency && w.currency.toLowerCase().includes(searchLower)) ||
+                          (w.network && w.network.toLowerCase().includes(searchLower));
     if (!matchesSearch) return false;
     if (withdrawalFilter !== 'all') return w.status === withdrawalFilter;
     return true;
   });
+
+  const handleCopyWalletAddress = (id: string, addr: string) => {
+    navigator.clipboard.writeText(addr);
+    setCopiedAddrId(id);
+    showToast("Address Copied", "Wallet address copied to clipboard", "info");
+    setTimeout(() => setCopiedAddrId(null), 2000);
+  };
+
+  const handleConfirmApprove = async () => {
+    if (!selectedWithdrawalForApprove) return;
+    if (!txHashInput.trim()) {
+      showToast("Missing TXID", "Please enter the Transaction Hash (TXID) for this payout.", "error");
+      return;
+    }
+
+    setIsActionSubmitting(true);
+    const res = await approveWithdrawal(selectedWithdrawalForApprove.id, txHashInput.trim(), adminNoteInput.trim());
+    setIsActionSubmitting(false);
+
+    if (res.success) {
+      showToast("Payout Approved", res.message, "success");
+      setSelectedWithdrawalForApprove(null);
+      setTxHashInput('');
+      setAdminNoteInput('');
+    } else {
+      showToast("Approval Failed", res.message, "error");
+    }
+  };
+
+  const handleConfirmReject = async () => {
+    if (!selectedWithdrawalForReject) return;
+    if (!rejectionReasonInput.trim()) {
+      showToast("Missing Reason", "Please provide a reason for rejecting this withdrawal.", "error");
+      return;
+    }
+
+    setIsActionSubmitting(true);
+    const res = await rejectWithdrawal(selectedWithdrawalForReject.id, rejectionReasonInput.trim(), adminNoteInput.trim());
+    setIsActionSubmitting(false);
+
+    if (res.success) {
+      showToast("Payout Rejected", res.message, "info");
+      setSelectedWithdrawalForReject(null);
+      setRejectionReasonInput('');
+      setAdminNoteInput('');
+    } else {
+      showToast("Rejection Failed", res.message, "error");
+    }
+  };
 
   const handleAddTask = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -256,7 +327,13 @@ export const AdminPanelView: React.FC = () => {
     }
 
     const finalTitle = taskTitle.trim() || 'Veloura Daily Quest';
-    const finalReward = parseFloat(taskReward) || 5.00;
+    const finalReward = parseFloat(taskReward);
+
+    if (isNaN(finalReward) || finalReward < 0.01) {
+      showToast("Validation Error", "Minimum task reward is 0.01 USDT.", "error");
+      return;
+    }
+
     const finalDuration = parseInt(taskDuration) || 30;
     const finalThumb = taskThumbnail.trim() || 'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?w=500&auto=format&fit=crop&q=80';
 
@@ -293,8 +370,14 @@ export const AdminPanelView: React.FC = () => {
 
   const handleSaveSettings = async (e: React.FormEvent) => {
     e.preventDefault();
+    const parsedMinW = parseFloat(minW);
+    if (isNaN(parsedMinW) || parsedMinW < 20.0) {
+      showToast("Validation Error", "Minimum withdrawal amount is 20 USDT.", "error");
+      return;
+    }
+
     await updateSystemSettings({
-      minWithdrawal: parseFloat(minW) || 10.0,
+      minWithdrawal: parsedMinW,
       referralBonus: parseFloat(refBonus) || 5.0,
       maintenanceMode: mMode,
       announcementBanner: {
@@ -590,12 +673,15 @@ export const AdminPanelView: React.FC = () => {
                     <input
                       type="number"
                       step="0.01"
-                      min="0.50"
+                      min="0.01"
                       required
                       value={taskReward}
                       onChange={(e) => setTaskReward(e.target.value)}
                       className="w-full glass-input rounded-xl px-4 py-3 text-xs text-slate-100 font-mono font-bold focus:border-purple-500 transition-colors"
                     />
+                    {taskReward !== '' && parseFloat(taskReward) < 0.01 && (
+                      <p className="text-[10px] text-rose-400 mt-1">Minimum task reward is 0.01 USDT.</p>
+                    )}
                   </div>
                 </div>
               </div>
@@ -654,7 +740,7 @@ export const AdminPanelView: React.FC = () => {
                         </div>
                         <div className="p-2 rounded-lg bg-slate-950/60 border border-slate-800 col-span-2 sm:col-span-1">
                           <span className="text-slate-500 block uppercase font-bold text-[9px]">Reward</span>
-                          <span className="text-emerald-400 font-mono font-bold block">${(parseFloat(taskReward) || 0).toFixed(2)}</span>
+                          <span className="text-emerald-400 font-mono font-bold block">+${(parseFloat(taskReward) || 0).toFixed(2)} USDT</span>
                         </div>
                       </div>
 
@@ -717,16 +803,19 @@ export const AdminPanelView: React.FC = () => {
       {adminTab === 'withdrawals' && (
         <div className="glass-panel p-6 rounded-3xl border border-slate-800 space-y-4">
           <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 pb-3 border-b border-slate-800">
-            <h3 className="text-sm font-bold text-slate-100 flex items-center gap-2">
-              <Wallet className="w-4 h-4 text-emerald-400" /> Cashout Approvals & Management
-            </h3>
+            <div>
+              <h3 className="text-sm font-bold text-slate-100 flex items-center gap-2">
+                <Wallet className="w-4 h-4 text-rose-400" /> Manual Crypto Payout Management
+              </h3>
+              <p className="text-[11px] text-slate-400 mt-0.5">Disburse USDT TRC20 payments outside app and enter TXID to approve</p>
+            </div>
 
             <div className="flex items-center gap-2">
               <div className="relative flex-1 sm:w-64">
                 <Search className="w-4 h-4 text-slate-500 absolute left-3 top-1/2 transform -translate-y-1/2" />
                 <input
                   type="text"
-                  placeholder="Search user email or method..."
+                  placeholder="Search email, wallet or network..."
                   value={withdrawalSearch}
                   onChange={(e) => setWithdrawalSearch(e.target.value)}
                   className="w-full glass-input pl-9 pr-3 py-1.5 text-xs text-slate-100 rounded-xl"
@@ -738,60 +827,120 @@ export const AdminPanelView: React.FC = () => {
                 onChange={(e) => setWithdrawalFilter(e.target.value as any)}
                 className="glass-input px-3 py-1.5 text-xs text-slate-300 rounded-xl bg-slate-900 border-slate-800"
               >
-                <option value="all">All Cashouts</option>
+                <option value="all">All Requests</option>
                 <option value="pending">Pending</option>
                 <option value="approved">Approved</option>
                 <option value="rejected">Rejected</option>
               </select>
+
+              <button
+                onClick={() => exportWithdrawalsCSV(filteredWithdrawals)}
+                className="p-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-bold border border-slate-700 flex items-center gap-1 shrink-0"
+                title="Export CSV"
+              >
+                <Download className="w-3.5 h-3.5" />
+              </button>
             </div>
           </div>
 
-          <div className="space-y-2">
+          <div className="space-y-3">
             {filteredWithdrawals.length === 0 ? (
               <div className="text-center py-12 text-slate-500 text-xs">No withdrawal requests match your search filter.</div>
             ) : (
-              filteredWithdrawals.map((w) => (
-                <div key={w.id} className="p-4 rounded-2xl bg-slate-900/60 border border-slate-800 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-                  <div>
-                    <div className="flex items-center space-x-2">
-                      <span className="text-xs font-bold text-slate-200">{w.userEmail}</span>
-                      <span className="text-[10px] font-bold text-purple-300 bg-purple-500/20 px-2 py-0.5 rounded border border-purple-500/30 uppercase">
-                        {w.method}
-                      </span>
-                    </div>
-                    <p className="text-[11px] text-slate-400 mt-0.5">
-                      Destination: <span className="font-mono text-slate-300">{w.destination}</span> • Submitted {new Date(w.createdAt).toLocaleDateString()}
-                    </p>
-                  </div>
+              filteredWithdrawals.map((w) => {
+                const walletAddr = w.walletAddress || w.destination || '';
+                const currencyStr = w.currency || 'USDT';
+                const networkStr = w.network || 'TRC20';
 
-                  <div className="flex items-center justify-between sm:justify-end gap-4 w-full sm:w-auto">
-                    <span className="text-lg font-black text-emerald-400">${w.amount.toFixed(2)}</span>
+                return (
+                  <div key={w.id} className="p-4 rounded-2xl bg-slate-900/70 border border-slate-800 space-y-3">
+                    <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+                      <div className="space-y-1">
+                        <div className="flex items-center space-x-2">
+                          <span className="text-xs font-bold text-slate-200">{w.userEmail}</span>
+                          {w.userName && <span className="text-[10px] text-slate-400">({w.userName})</span>}
+                          <span className="text-[10px] font-bold text-rose-300 bg-rose-500/20 px-2 py-0.5 rounded border border-rose-500/30 uppercase">
+                            {currencyStr} ({networkStr})
+                          </span>
+                        </div>
 
-                    {w.status === 'pending' ? (
-                      <div className="flex space-x-2">
-                        <button
-                          onClick={() => updateWithdrawalStatus(w.id, 'approved')}
-                          className="px-3 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold shadow-md inline-flex items-center gap-1"
-                        >
-                          <Check className="w-3.5 h-3.5" /> Approve
-                        </button>
-                        <button
-                          onClick={() => updateWithdrawalStatus(w.id, 'rejected')}
-                          className="px-3 py-1.5 rounded-xl bg-rose-600 hover:bg-rose-500 text-white text-xs font-bold shadow-md inline-flex items-center gap-1"
-                        >
-                          <X className="w-3.5 h-3.5" /> Reject & Refund
-                        </button>
+                        <div className="flex items-center gap-2 text-xs">
+                          <span className="text-slate-400">TRC20 Wallet:</span>
+                          <span className="font-mono text-slate-200 font-bold bg-slate-950 px-2 py-0.5 rounded border border-slate-800 select-all">
+                            {walletAddr}
+                          </span>
+                          <button
+                            onClick={() => handleCopyWalletAddress(w.id, walletAddr)}
+                            className="p-1 rounded bg-slate-800 hover:bg-slate-700 text-slate-300 transition-colors text-[10px] flex items-center gap-1"
+                            title="Copy TRC20 Wallet Address"
+                          >
+                            {copiedAddrId === w.id ? <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
+                            <span>{copiedAddrId === w.id ? 'Copied' : 'Copy'}</span>
+                          </button>
+                        </div>
+
+                        <p className="text-[10px] text-slate-500">
+                          Submitted: {new Date(w.createdAt).toLocaleDateString()} {new Date(w.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                        </p>
                       </div>
-                    ) : (
-                      <span className={`px-3 py-1 rounded-full text-[10px] font-bold uppercase border ${
-                        w.status === 'approved' ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/30' : 'bg-rose-500/20 text-rose-300 border-rose-500/30'
-                      }`}>
-                        {w.status}
-                      </span>
+
+                      <div className="flex items-center justify-between sm:justify-end gap-4 w-full sm:w-auto pt-2 sm:pt-0 border-t sm:border-0 border-slate-800/80">
+                        <div className="text-right">
+                          <div className="text-lg font-black text-rose-400">${w.amount.toFixed(2)}</div>
+                          <div className="text-[9px] font-bold text-slate-400">USDT</div>
+                        </div>
+
+                        {w.status === 'pending' ? (
+                          <div className="flex space-x-2">
+                            <button
+                              onClick={() => {
+                                setSelectedWithdrawalForApprove(w);
+                                setTxHashInput('');
+                                setAdminNoteInput('');
+                              }}
+                              className="px-3.5 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold shadow-md inline-flex items-center gap-1.5 transition-all"
+                            >
+                              <Check className="w-4 h-4" /> Approve
+                            </button>
+                            <button
+                              onClick={() => {
+                                setSelectedWithdrawalForReject(w);
+                                setRejectionReasonInput('');
+                                setAdminNoteInput('');
+                              }}
+                              className="px-3.5 py-2 rounded-xl bg-rose-600 hover:bg-rose-500 text-white text-xs font-bold shadow-md inline-flex items-center gap-1.5 transition-all"
+                            >
+                              <X className="w-4 h-4" /> Reject & Refund
+                            </button>
+                          </div>
+                        ) : (
+                          <span className={`px-3 py-1 rounded-full text-[10px] font-bold uppercase border flex items-center gap-1 ${
+                            w.status === 'approved' ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/30' : 'bg-rose-500/20 text-rose-300 border-rose-500/30'
+                          }`}>
+                            {w.status === 'approved' ? <CheckCircle2 className="w-3.5 h-3.5" /> : <X className="w-3.5 h-3.5" />}
+                            <span>{w.status}</span>
+                          </span>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Approved/Rejected Audit Record inside Card */}
+                    {w.status === 'approved' && w.txHash && (
+                      <div className="p-2.5 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-300 text-[11px] flex flex-wrap items-center justify-between gap-2">
+                        <span className="font-mono"><strong>TXID:</strong> {w.txHash}</span>
+                        {w.adminNote && <span className="text-slate-400">Memo: {w.adminNote}</span>}
+                      </div>
+                    )}
+
+                    {w.status === 'rejected' && w.rejectionReason && (
+                      <div className="p-2.5 rounded-xl bg-rose-500/10 border border-rose-500/20 text-rose-300 text-[11px] flex flex-wrap items-center justify-between gap-2">
+                        <span><strong>Reason:</strong> {w.rejectionReason}</span>
+                        {w.adminNote && <span className="text-slate-400">Memo: {w.adminNote}</span>}
+                      </div>
                     )}
                   </div>
-                </div>
-              ))
+                );
+              })
             )}
           </div>
         </div>
@@ -888,12 +1037,16 @@ export const AdminPanelView: React.FC = () => {
                   <label className="block text-xs font-bold text-slate-400 mb-1 uppercase">Minimum Withdrawal Threshold ($)</label>
                   <input
                     type="number"
-                    step="1"
+                    step="0.01"
+                    min="20.00"
                     required
                     value={minW}
                     onChange={(e) => setMinW(e.target.value)}
                     className="w-full glass-input rounded-xl px-4 py-2.5 text-xs text-slate-100 font-mono font-bold"
                   />
+                  {minW !== '' && parseFloat(minW) < 20 && (
+                    <p className="text-[10px] text-rose-400 mt-1">Minimum withdrawal amount is 20 USDT.</p>
+                  )}
                 </div>
 
                 <div>
@@ -1056,6 +1209,180 @@ export const AdminPanelView: React.FC = () => {
       {/* Wallet Adjustment Modal */}
       {adjustmentUser && (
         <WalletAdjustmentModal user={adjustmentUser} onClose={() => setAdjustmentUser(null)} />
+      )}
+
+      {/* Approve Modal */}
+      {selectedWithdrawalForApprove && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-md animate-fade-in">
+          <div className="relative w-full max-w-md glass-panel rounded-3xl p-6 border border-emerald-500/30 shadow-2xl space-y-4">
+            <div className="flex items-center justify-between border-b border-slate-800 pb-3">
+              <div className="flex items-center space-x-2">
+                <div className="w-8 h-8 rounded-lg bg-emerald-500/20 text-emerald-400 flex items-center justify-center">
+                  <CheckCircle2 className="w-5 h-5" />
+                </div>
+                <h3 className="text-base font-bold text-slate-100">Approve USDT Cashout</h3>
+              </div>
+              <button onClick={() => setSelectedWithdrawalForApprove(null)} className="text-slate-400 hover:text-white">
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <div className="p-3.5 rounded-2xl bg-slate-900/90 border border-slate-800 space-y-1.5 text-xs">
+              <div className="flex justify-between">
+                <span className="text-slate-400">User:</span>
+                <span className="font-bold text-slate-200">{selectedWithdrawalForApprove.userEmail}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-slate-400">Payout Amount:</span>
+                <span className="font-black text-emerald-400">${selectedWithdrawalForApprove.amount.toFixed(2)} USDT</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-slate-400">Network:</span>
+                <span className="font-bold text-rose-300">TRC20</span>
+              </div>
+              <div className="space-y-1 pt-1 border-t border-slate-800">
+                <span className="text-slate-400 block text-[10px]">Destination Address:</span>
+                <div className="flex items-center justify-between bg-slate-950 p-2 rounded border border-slate-800 font-mono text-[11px] text-slate-200">
+                  <span className="truncate mr-2">{selectedWithdrawalForApprove.walletAddress || selectedWithdrawalForApprove.destination}</span>
+                  <button 
+                    onClick={() => handleCopyWalletAddress(selectedWithdrawalForApprove.id, selectedWithdrawalForApprove.walletAddress || selectedWithdrawalForApprove.destination)}
+                    className="text-xs text-rose-400 hover:underline shrink-0 font-sans font-bold"
+                  >
+                    Copy
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            <div className="space-y-3">
+              <div>
+                <label className="block text-xs font-semibold text-slate-300 mb-1">
+                  Blockchain Transaction Hash (TXID) <span className="text-rose-400">*</span>
+                </label>
+                <input
+                  type="text"
+                  placeholder="Paste TRC20 TXID (e.g. 5f4a8b7c9d0e1f...)"
+                  value={txHashInput}
+                  onChange={(e) => setTxHashInput(e.target.value)}
+                  className="w-full glass-input rounded-xl px-3.5 py-2.5 text-xs text-slate-100 font-mono"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold text-slate-300 mb-1">
+                  Admin Note (Optional)
+                </label>
+                <input
+                  type="text"
+                  placeholder="e.g. Sent via Binance / TRON wallet memo..."
+                  value={adminNoteInput}
+                  onChange={(e) => setAdminNoteInput(e.target.value)}
+                  className="w-full glass-input rounded-xl px-3.5 py-2.5 text-xs text-slate-100"
+                />
+              </div>
+            </div>
+
+            <div className="flex space-x-3 pt-2">
+              <button
+                type="button"
+                onClick={() => setSelectedWithdrawalForApprove(null)}
+                className="flex-1 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-xs font-bold text-slate-300"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                disabled={isActionSubmitting || !txHashInput.trim()}
+                onClick={handleConfirmApprove}
+                className="flex-1 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 text-xs font-bold text-white shadow-lg flex items-center justify-center gap-1.5"
+              >
+                {isActionSubmitting ? <Lock className="w-4 h-4 animate-spin" /> : <Check className="w-4 h-4" />}
+                <span>Confirm & Mark Paid</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Reject Modal */}
+      {selectedWithdrawalForReject && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-md animate-fade-in">
+          <div className="relative w-full max-w-md glass-panel rounded-3xl p-6 border border-rose-500/30 shadow-2xl space-y-4">
+            <div className="flex items-center justify-between border-b border-slate-800 pb-3">
+              <div className="flex items-center space-x-2">
+                <div className="w-8 h-8 rounded-lg bg-rose-500/20 text-rose-400 flex items-center justify-center">
+                  <AlertTriangle className="w-5 h-5" />
+                </div>
+                <h3 className="text-base font-bold text-slate-100">Reject & Refund Request</h3>
+              </div>
+              <button onClick={() => setSelectedWithdrawalForReject(null)} className="text-slate-400 hover:text-white">
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <div className="p-3.5 rounded-2xl bg-slate-900/90 border border-slate-800 space-y-1.5 text-xs">
+              <div className="flex justify-between">
+                <span className="text-slate-400">User:</span>
+                <span className="font-bold text-slate-200">{selectedWithdrawalForReject.userEmail}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-slate-400">Amount to Refund:</span>
+                <span className="font-black text-rose-400">${selectedWithdrawalForReject.amount.toFixed(2)} USDT</span>
+              </div>
+            </div>
+
+            <div className="p-3 rounded-xl bg-amber-500/10 border border-amber-500/30 text-amber-200 text-xs">
+              ⚠️ Rejecting this payout will automatically refund ${selectedWithdrawalForReject.amount.toFixed(2)} USDT back to the user's wallet balance.
+            </div>
+
+            <div className="space-y-3">
+              <div>
+                <label className="block text-xs font-semibold text-slate-300 mb-1">
+                  Rejection Reason <span className="text-rose-400">*</span>
+                </label>
+                <input
+                  type="text"
+                  placeholder="e.g. Invalid TRC20 wallet address / Duplicate request..."
+                  value={rejectionReasonInput}
+                  onChange={(e) => setRejectionReasonInput(e.target.value)}
+                  className="w-full glass-input rounded-xl px-3.5 py-2.5 text-xs text-slate-100"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold text-slate-300 mb-1">
+                  Admin Audit Note (Optional)
+                </label>
+                <input
+                  type="text"
+                  placeholder="Internal notes for audit ledger..."
+                  value={adminNoteInput}
+                  onChange={(e) => setAdminNoteInput(e.target.value)}
+                  className="w-full glass-input rounded-xl px-3.5 py-2.5 text-xs text-slate-100"
+                />
+              </div>
+            </div>
+
+            <div className="flex space-x-3 pt-2">
+              <button
+                type="button"
+                onClick={() => setSelectedWithdrawalForReject(null)}
+                className="flex-1 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-xs font-bold text-slate-300"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                disabled={isActionSubmitting || !rejectionReasonInput.trim()}
+                onClick={handleConfirmReject}
+                className="flex-1 py-2.5 rounded-xl bg-rose-600 hover:bg-rose-500 disabled:opacity-50 text-xs font-bold text-white shadow-lg flex items-center justify-center gap-1.5"
+              >
+                {isActionSubmitting ? <Lock className="w-4 h-4 animate-spin" /> : <X className="w-4 h-4" />}
+                <span>Reject & Refund</span>
+              </button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );

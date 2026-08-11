@@ -76,18 +76,25 @@
     },
     "withdrawals": {
       "title": "withdrawals",
-      "description": "Withdrawal request logs",
+      "description": "Manual Crypto USDT TRC20 Withdrawal Requests",
       "type": "object",
       "properties": {
         "userId": { "type": "string" },
         "userEmail": { "type": "string" },
+        "userName": { "type": "string" },
         "amount": { "type": "number" },
-        "method": { "type": "string" },
-        "destination": { "type": "string" },
+        "currency": { "type": "string" },
+        "network": { "type": "string" },
+        "walletAddress": { "type": "string" },
         "status": { "type": "string" },
-        "createdAt": { "type": "string" }
+        "createdAt": { "type": "string" },
+        "processedAt": { "type": "string" },
+        "processedBy": { "type": "string" },
+        "adminNote": { "type": "string" },
+        "txHash": { "type": "string" },
+        "rejectionReason": { "type": "string" }
       },
-      "required": ["userId", "amount", "method", "status"]
+      "required": ["userId", "amount", "currency", "network", "walletAddress", "status"]
     },
     "referrals": {
       "title": "referrals",

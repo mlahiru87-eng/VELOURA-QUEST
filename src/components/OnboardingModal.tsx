@@ -21,14 +21,14 @@ export const OnboardingModal: React.FC = () => {
       ]
     },
     {
-      title: "Earn $5.00 per Friend Invited",
-      subtitle: "Share your exclusive referral code to build passive income.",
+      title: "Earn 50% Referral Commission",
+      subtitle: "Share your exclusive referral code to build passive daily income.",
       icon: <Gift className="w-12 h-12 text-amber-400" />,
       badge: "Step 2 of 3",
       bullets: [
         `Your unique referral code is: ${userProfile.referralCode}`,
-        "Friends get $5.00 welcome bonus when registering.",
-        "You unlock $5.00 cash as soon as your friend completes 1 quest!"
+        "Direct referrals earn you 50% of their task rewards.",
+        "Get paid automatically whenever your referred friends complete tasks!"
       ]
     },
     {

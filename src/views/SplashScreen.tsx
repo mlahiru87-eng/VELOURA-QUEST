@@ -63,7 +63,7 @@ export const SplashScreen: React.FC = () => {
           </div>
           <div className="p-3 glass-panel rounded-2xl text-center space-y-1 hover:border-amber-500/40 transition-all">
             <Trophy className="w-5 h-5 text-amber-400 mx-auto" />
-            <span className="text-[10px] font-bold text-slate-200 block">$5 Referral</span>
+            <span className="text-[10px] font-bold text-slate-200 block">50% Referral</span>
           </div>
           <div className="p-3 glass-panel rounded-2xl text-center space-y-1 hover:border-emerald-500/40 transition-all">
             <ShieldCheck className="w-5 h-5 text-emerald-400 mx-auto" />
@@ -79,7 +79,7 @@ export const SplashScreen: React.FC = () => {
           onClick={() => setCurrentPage('register')}
           className="w-full py-4 rounded-2xl electric-gradient-btn text-sm font-bold text-white shadow-xl glow-red flex items-center justify-center gap-2 group transition-all"
         >
-          <span>Confirm 18+ & Claim $5.00 Bonus</span>
+          <span>Confirm 18+ & Start Quests</span>
           <ChevronRight className="w-4 h-4 transition-transform group-hover:translate-x-1" />
         </button>
 

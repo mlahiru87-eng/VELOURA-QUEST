@@ -3,6 +3,7 @@ import { useAuth } from '../context/AuthContext';
 import { doc, getDoc, runTransaction, updateDoc, collection, query, where, getDocs, addDoc } from 'firebase/firestore';
 import { db } from '../lib/firebase';
 import { telemetry } from '../lib/telemetry';
+import { processTaskReferralCommission } from '../lib/referralCommission';
 import { CheckCircle2, AlertCircle, ShieldAlert, Zap, Clock, ArrowLeft, RefreshCw, Sparkles } from 'lucide-react';
 
 export const QuestCompleteView: React.FC = () => {
@@ -256,49 +257,17 @@ export const QuestCompleteView: React.FC = () => {
 
       telemetry.recordFirestoreWrite();
 
-      // Check referral bonus
+      // Process 50% referral commission for referrer
       try {
-        const completionsQuery = query(collection(db, 'taskCompletions'), where('userId', '==', currentUser.uid));
-        const completionsSnap = await getDocs(completionsQuery);
-        if (completionsSnap.size === 1) {
-          const qRefPending = query(
-            collection(db, 'referrals'),
-            where('refereeId', '==', currentUser.uid),
-            where('status', '==', 'pending')
-          );
-          const pendingSnap = await getDocs(qRefPending);
-          if (!pendingSnap.empty) {
-            const refDoc = pendingSnap.docs[0];
-            const refData = refDoc.data();
-            const rewardAmount = refData.rewardAmount || 5.00;
-
-            await updateDoc(doc(db, 'referrals', refDoc.id), {
-              status: 'completed',
-              completedAt: new Date().toISOString()
-            });
-
-            const referrerUserRef = doc(db, 'users', refData.referrerId);
-            const referrerSnap = await getDoc(referrerUserRef);
-            if (referrerSnap.exists()) {
-              const referrerProfile = referrerSnap.data();
-              await updateDoc(referrerUserRef, {
-                currentBalance: (referrerProfile.currentBalance || 0) + rewardAmount,
-                totalEarned: (referrerProfile.totalEarned || 0) + rewardAmount
-              });
-
-              await addDoc(collection(db, 'transactions'), {
-                userId: refData.referrerId,
-                type: 'referral_bonus',
-                amount: rewardAmount,
-                description: `Referral Bonus: ${currentUser.displayName || 'Friend'} completed 1st task!`,
-                status: 'completed',
-                createdAt: new Date().toISOString()
-              });
-            }
-          }
-        }
+        const taskCompletionId = `comp_${currentUser.uid}_${sessionId}`;
+        await processTaskReferralCommission({
+          taskCompletionId: taskCompletionId,
+          referredUserId: currentUser.uid,
+          referredUserName: currentUser.displayName || '',
+          taskReward: finalReward
+        });
       } catch (refErr) {
-        console.warn('Referral bonus error:', refErr);
+        console.warn('Referral commission error:', refErr);
       }
 
       setClaimedReward(finalReward);

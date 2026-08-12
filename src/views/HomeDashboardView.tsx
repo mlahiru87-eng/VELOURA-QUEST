@@ -252,11 +252,11 @@ export const HomeDashboardView: React.FC = () => {
       <div className="glass-panel p-6 rounded-3xl border border-purple-500/30 relative overflow-hidden flex flex-col md:flex-row items-center justify-between gap-6">
         <div className="space-y-2 max-w-xl">
           <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[10px] font-bold bg-amber-500/20 text-amber-300 border border-amber-500/30">
-            <Users className="w-3.5 h-3.5 text-amber-400" /> Instant Referral Bonus
+            <Users className="w-3.5 h-3.5 text-amber-400" /> 50% Referral Commission
           </span>
-          <h3 className="text-lg font-bold text-slate-100">Invite Friends & Unlock $5.00 Cash per Referral</h3>
+          <h3 className="text-lg font-bold text-slate-100">Invite Friends & Earn 50% Daily Task Commissions</h3>
           <p className="text-xs text-slate-400 leading-relaxed">
-            Share your exclusive referral code. When your referred friend completes their 1st daily quest, you instantly unlock $5.00 cash directly in your wallet!
+            Share your exclusive referral code. Earn 50% of the task rewards earned by users you directly refer, automatically credited to your wallet!
           </p>
         </div>
 

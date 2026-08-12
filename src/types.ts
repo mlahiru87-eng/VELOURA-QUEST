@@ -78,6 +78,12 @@ export interface TransactionRecord {
   description: string;
   status: 'completed' | 'pending' | 'rejected';
   createdAt: string;
+  // Referral Commission specific fields
+  taskReward?: number;
+  commissionRate?: number;
+  referredUserId?: string;
+  referredUserName?: string;
+  taskCompletionId?: string;
 }
 
 export interface WalletRecord {
@@ -114,8 +120,12 @@ export interface ReferralRecord {
   referrerId: string;
   refereeId: string;
   refereeName: string;
-  rewardAmount: number;
-  status: 'pending' | 'completed';
+  rewardAmount?: number;
+  referredUserId?: string;
+  referrerUserId?: string;
+  referralCode?: string;
+  totalCommissionEarned?: number;
+  status: 'active' | 'pending' | 'completed';
   createdAt: string;
   completedAt?: string;
 }
@@ -146,6 +156,7 @@ export interface AnnouncementBanner {
 export interface SystemSettings {
   minWithdrawal: number;
   referralBonus: number;
+  referralCommissionRate?: number;
   maintenanceMode: boolean;
   announcementBanner?: AnnouncementBanner;
   featureFlags: FeatureFlags;

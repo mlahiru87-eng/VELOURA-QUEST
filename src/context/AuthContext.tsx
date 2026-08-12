@@ -38,6 +38,7 @@ import {
 import { INITIAL_TASKS, INITIAL_NOTIFICATIONS, DEFAULT_SETTINGS } from '../data/initialData';
 import { checkClaimRateLimit, recordLoginAttempt, evaluateSuspiciousActivity, isValidTRC20Address, maskWalletAddress } from '../lib/securityAndUtils';
 import { telemetry } from '../lib/telemetry';
+import { processTaskReferralCommission } from '../lib/referralCommission';
 
 export enum OperationType {
   CREATE = 'create',
@@ -587,18 +588,20 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             const referrerData = refSnap.docs[0].data() as UserProfile;
             
             await addDoc(collection(db, 'referrals'), {
+              referredUserId: newUid,
+              referrerUserId: referrerData.uid,
+              referralCode: refCode.trim(),
+              status: 'active',
+              createdAt: new Date().toISOString(),
               referrerId: referrerData.uid,
               refereeId: newUid,
               refereeName: newProfile.displayName,
-              rewardAmount: settings.referralBonus || 5.00,
-              status: 'pending',
-              createdAt: new Date().toISOString()
             });
 
             await addDoc(collection(db, 'notifications'), {
               userId: referrerData.uid,
               title: 'New Referral Joined!',
-              message: `${newProfile.displayName} joined using your code. $${settings.referralBonus || 5.00} reward will be awarded after their 1st completed task!`,
+              message: `${newProfile.displayName} joined using your referral code. You will earn 50% referral commission whenever they complete daily tasks!`,
               type: 'reward',
               read: false,
               createdAt: new Date().toISOString()
@@ -778,60 +781,16 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         createdAt: new Date().toISOString()
       });
 
-      // 5. Unlock Referral Bonus if first task
-      if (isFirstTaskEver) {
-        try {
-          const qRefPending = query(
-            collection(db, 'referrals'),
-            where('refereeId', '==', userProfile.uid),
-            where('status', '==', 'pending')
-          );
-          const pendingSnap = await getDocs(qRefPending);
-          
-          if (!pendingSnap.empty) {
-            const refDoc = pendingSnap.docs[0];
-            const refData = refDoc.data() as ReferralRecord;
-            const rewardAmount = refData.rewardAmount || settings.referralBonus || 5.00;
-
-            await updateDoc(doc(db, 'referrals', refDoc.id), {
-              status: 'completed',
-              completedAt: new Date().toISOString()
-            });
-
-            const referrerUserRef = doc(db, 'users', refData.referrerId);
-            const referrerSnap = await getDoc(referrerUserRef);
-            if (referrerSnap.exists()) {
-              const referrerProfile = referrerSnap.data() as UserProfile;
-              const updatedRefBalance = (referrerProfile.currentBalance || 0) + rewardAmount;
-              const updatedRefEarned = (referrerProfile.totalEarned || 0) + rewardAmount;
-
-              await updateDoc(referrerUserRef, {
-                currentBalance: updatedRefBalance,
-                totalEarned: updatedRefEarned
-              });
-
-              await addDoc(collection(db, 'transactions'), {
-                userId: refData.referrerId,
-                type: 'referral_bonus',
-                amount: rewardAmount,
-                description: `Referral Bonus: ${userProfile.displayName} completed 1st task!`,
-                status: 'completed',
-                createdAt: new Date().toISOString()
-              });
-
-              await addDoc(collection(db, 'notifications'), {
-                userId: refData.referrerId,
-                title: 'Referral Bonus Unlocked!',
-                message: `${userProfile.displayName} completed their first quest! $${rewardAmount.toFixed(2)} referral bonus was added to your wallet.`,
-                type: 'reward',
-                read: false,
-                createdAt: new Date().toISOString()
-              });
-            }
-          }
-        } catch (err) {
-          handleFirestoreError(err, OperationType.UPDATE, 'referrals');
-        }
+      // 5. Process 50% Referral Commission
+      try {
+        await processTaskReferralCommission({
+          taskCompletionId: compRef.id,
+          referredUserId: userProfile.uid,
+          referredUserName: userProfile.displayName,
+          taskReward: reward
+        });
+      } catch (refErr) {
+        console.error('Referral commission error in claimTaskReward:', refErr);
       }
 
       setClaimingTaskId(null);

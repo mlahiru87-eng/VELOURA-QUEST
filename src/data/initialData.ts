@@ -100,8 +100,8 @@ export const INITIAL_NOTIFICATIONS: NotificationItem[] = [
   {
     id: 'notif-3',
     userId: 'all',
-    title: 'Referral Bonus Boost',
-    message: 'Earn $5.00 instantly for every friend you invite using your unique referral link!',
+    title: '50% Referral Commission Active',
+    message: 'Earn 50% referral commission for every friend you invite whenever they complete daily tasks!',
     type: 'reward',
     read: false,
     createdAt: new Date(Date.now() - 86400000).toISOString(),
@@ -110,7 +110,8 @@ export const INITIAL_NOTIFICATIONS: NotificationItem[] = [
 
 export const DEFAULT_SETTINGS: SystemSettings = {
   minWithdrawal: 20.0,
-  referralBonus: 5.0,
+  referralBonus: 0,
+  referralCommissionRate: 0.50,
   maintenanceMode: false,
   announcementBanner: {
     active: true,

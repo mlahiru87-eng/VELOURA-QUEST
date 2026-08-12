@@ -6,6 +6,7 @@ import { AnalyticsDashboard } from '../components/AnalyticsDashboard';
 import { UserTimelineModal } from '../components/UserTimelineModal';
 import { WalletAdjustmentModal } from '../components/WalletAdjustmentModal';
 import { exportUsersCSV, exportWithdrawalsCSV, exportTransactionsCSV } from '../lib/securityAndUtils';
+import { formatUsdtAmount } from '../lib/referralCommission';
 import { doc, getDoc } from 'firebase/firestore';
 import { db } from '../lib/firebase';
 import { 
@@ -58,7 +59,7 @@ export const AdminPanelView: React.FC = () => {
 
   const { showToast } = useToast();
 
-  const [adminTab, setAdminTab] = useState<'analytics' | 'users' | 'tasks' | 'withdrawals' | 'audit' | 'notifications' | 'settings'>('analytics');
+  const [adminTab, setAdminTab] = useState<'analytics' | 'users' | 'tasks' | 'withdrawals' | 'referrals' | 'audit' | 'notifications' | 'settings'>('analytics');
 
   // Search & Filter state for users
   const [userSearch, setUserSearch] = useState('');
@@ -435,6 +436,7 @@ export const AdminPanelView: React.FC = () => {
           { id: 'users', label: `Users (${allUsers.length})`, icon: <Users className="w-4 h-4" /> },
           { id: 'tasks', label: `Tasks (${tasks.length})`, icon: <CheckSquare className="w-4 h-4" /> },
           { id: 'withdrawals', label: `Cashouts (${allWithdrawals.filter(w=>w.status==='pending').length} pending)`, icon: <Wallet className="w-4 h-4" /> },
+          { id: 'referrals', label: 'Referral Commissions', icon: <DollarSign className="w-4 h-4" /> },
           { id: 'audit', label: `Audit Logs (${auditLogs.length})`, icon: <FileText className="w-4 h-4" /> },
           { id: 'notifications', label: 'Announcements', icon: <Bell className="w-4 h-4" /> },
           { id: 'settings', label: 'System Settings', icon: <Settings className="w-4 h-4" /> },
@@ -1022,6 +1024,107 @@ export const AdminPanelView: React.FC = () => {
         </div>
       )}
 
+      {/* Referrals Tab */}
+      {adminTab === 'referrals' && (() => {
+        const allReferralTx = allTransactions.filter(t => t.type === 'referral_bonus' && t.status === 'completed');
+        const totalReferralPayouts = allReferralTx.reduce((sum, t) => sum + t.amount, 0);
+
+        return (
+          <div className="space-y-6">
+            {/* Summary Cards */}
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+              <div className="glass-panel p-5 rounded-2xl border border-purple-500/30 bg-purple-950/20">
+                <span className="text-[10px] font-bold uppercase text-purple-300 block mb-1">Referral Commission Rate</span>
+                <div className="text-2xl font-black text-purple-400">50%</div>
+                <p className="text-[10px] text-slate-400 mt-1">Single-level commission on task rewards</p>
+              </div>
+
+              <div className="glass-panel p-5 rounded-2xl border border-slate-800">
+                <span className="text-[10px] font-bold uppercase text-slate-400 block mb-1">Total Referral Commissions Paid</span>
+                <div className="text-2xl font-black text-emerald-400">${formatUsdtAmount(totalReferralPayouts)} USDT</div>
+                <p className="text-[10px] text-slate-400 mt-1">Platform total referral earnings</p>
+              </div>
+
+              <div className="glass-panel p-5 rounded-2xl border border-slate-800">
+                <span className="text-[10px] font-bold uppercase text-slate-400 block mb-1">Total Commission Transactions</span>
+                <div className="text-2xl font-black text-amber-300">{allReferralTx.length}</div>
+                <p className="text-[10px] text-slate-400 mt-1">Executed referral payouts</p>
+              </div>
+            </div>
+
+            {/* Referral Commission Transactions Table */}
+            <div className="glass-panel rounded-3xl border border-slate-800 overflow-hidden space-y-4 p-6">
+              <div className="flex items-center justify-between">
+                <div>
+                  <h3 className="text-sm font-bold text-slate-100 flex items-center gap-2">
+                    <DollarSign className="w-4 h-4 text-emerald-400" /> Referral Commission Transactions
+                  </h3>
+                  <p className="text-xs text-slate-400 mt-0.5">Auditable log of all 50% referral commissions credited to referrers</p>
+                </div>
+                <span className="text-xs font-mono font-bold text-slate-400 bg-slate-900 px-3 py-1 rounded-full border border-slate-800">
+                  {allReferralTx.length} Records
+                </span>
+              </div>
+
+              <div className="overflow-x-auto">
+                <table className="w-full text-left text-xs">
+                  <thead className="bg-slate-900/80 text-slate-400 text-[10px] uppercase font-bold border-b border-slate-800">
+                    <tr>
+                      <th className="p-3.5">Date</th>
+                      <th className="p-3.5">Referrer</th>
+                      <th className="p-3.5">Referred User</th>
+                      <th className="p-3.5 text-right">Task Reward</th>
+                      <th className="p-3.5 text-right">Commission (50%)</th>
+                      <th className="p-3.5 text-center">Status</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-800/60 font-mono text-slate-300">
+                    {allReferralTx.length === 0 ? (
+                      <tr>
+                        <td colSpan={6} className="text-center py-8 text-slate-500 text-xs font-sans">
+                          No referral commission transactions logged yet.
+                        </td>
+                      </tr>
+                    ) : (
+                      allReferralTx.map((tx) => {
+                        const referrer = allUsers.find(u => u.uid === tx.userId);
+                        const referrerName = referrer ? referrer.displayName || referrer.email : tx.userId;
+                        const taskReward = tx.taskReward ?? (tx.amount * 2);
+
+                        return (
+                          <tr key={tx.id} className="hover:bg-slate-900/40 transition-colors">
+                            <td className="p-3.5 text-slate-400 font-sans text-[11px]">
+                              {new Date(tx.createdAt).toLocaleDateString()} {new Date(tx.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                            </td>
+                            <td className="p-3.5 font-sans font-bold text-slate-200">
+                              {referrerName}
+                            </td>
+                            <td className="p-3.5 font-sans text-purple-300 font-semibold">
+                              {tx.referredUserName || 'Referred User'}
+                            </td>
+                            <td className="p-3.5 text-right text-slate-300">
+                              ${formatUsdtAmount(taskReward)} USDT
+                            </td>
+                            <td className="p-3.5 text-right font-black text-emerald-400">
+                              +${formatUsdtAmount(tx.amount)} USDT
+                            </td>
+                            <td className="p-3.5 text-center font-sans">
+                              <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
+                                Completed
+                              </span>
+                            </td>
+                          </tr>
+                        );
+                      })
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+        );
+      })()}
+
       {/* System Settings Tab */}
       {adminTab === 'settings' && (
         <div className="space-y-6 max-w-2xl">
@@ -1050,15 +1153,14 @@ export const AdminPanelView: React.FC = () => {
                 </div>
 
                 <div>
-                  <label className="block text-xs font-bold text-slate-400 mb-1 uppercase">Referral Bonus Amount ($)</label>
+                  <label className="block text-xs font-bold text-slate-400 mb-1 uppercase">Referral Commission Rate (%)</label>
                   <input
-                    type="number"
-                    step="0.5"
-                    required
-                    value={refBonus}
-                    onChange={(e) => setRefBonus(e.target.value)}
-                    className="w-full glass-input rounded-xl px-4 py-2.5 text-xs text-slate-100 font-mono font-bold"
+                    type="text"
+                    disabled
+                    value="50% (Fixed 50% of task rewards)"
+                    className="w-full glass-input rounded-xl px-4 py-2.5 text-xs text-purple-300 font-mono font-bold bg-slate-900/60 cursor-not-allowed border-slate-800"
                   />
+                  <p className="text-[10px] text-slate-500 mt-1">Single-level commission on referred user's daily task rewards.</p>
                 </div>
               </div>
 

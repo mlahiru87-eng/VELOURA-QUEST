@@ -148,7 +148,7 @@ export const RegisterView: React.FC = () => {
 
           <div>
             <label className="block text-xs font-semibold text-slate-300 mb-1">
-              Referral Code <span className="text-purple-400 font-normal">(Optional - +${settings.referralBonus.toFixed(2)} Bonus)</span>
+              Referral Code <span className="text-purple-400 font-normal">(Optional)</span>
             </label>
             <div className="relative">
               <Gift className="w-4 h-4 text-amber-400 absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />

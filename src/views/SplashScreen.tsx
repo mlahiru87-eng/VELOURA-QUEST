@@ -31,15 +31,17 @@ export const SplashScreen: React.FC = () => {
 
       {/* Main Hero Card */}
       <div className="w-full max-w-md my-auto space-y-6 z-10 text-center">
-        <div className="relative inline-block mx-auto mb-2 animated-float">
-          <div className="w-24 h-24 rounded-3xl electric-gradient-btn flex items-center justify-center text-white shadow-2xl glow-red mx-auto relative overflow-hidden">
-            <Trophy className="w-12 h-12 text-amber-300" />
-            <span className="absolute bottom-1 right-1 text-[11px] font-black px-1.5 py-0.5 rounded bg-black/80 text-rose-400 border border-rose-500/50">
-              18+
-            </span>
-          </div>
-          <div className="absolute -top-2 -right-2 p-1.5 rounded-full bg-rose-600 text-white shadow-md animate-bounce">
-            <Flame className="w-4 h-4 fill-white" />
+        <div className="relative inline-block mx-auto mb-2">
+          <div className="relative flex items-center justify-center">
+            <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-48 h-48 rounded-full border border-rose-500/20 bg-rose-600/10 pointer-events-none blur-xl" />
+            <img
+              src="/veloura-logo.png"
+              onError={(e) => {
+                (e.target as HTMLImageElement).src = 'https://lh3.googleusercontent.com/d/1ztGHTiifIgk6YlzX0LqprR3UF5mTQc6f';
+              }}
+              alt="Veloura Quest Logo"
+              className="w-44 sm:w-48 object-contain h-auto drop-shadow-[0_0_20px_rgba(225,29,72,0.6)] animate-logo-float-breath"
+            />
           </div>
         </div>
 

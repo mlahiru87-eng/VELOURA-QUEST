@@ -10,6 +10,7 @@ import { DashboardSkeleton } from './components/SkeletonLoaders';
 import { AnnouncementBanner } from './components/AnnouncementBanner';
 import { MaintenanceScreen } from './components/MaintenanceScreen';
 import { SuspendedScreen } from './components/SuspendedScreen';
+import { LoadingScreen } from './components/LoadingScreen';
 
 // Lazy load view routes for code-splitting and performance
 const SplashScreen = lazy(() => import('./views/SplashScreen').then(m => ({ default: m.SplashScreen })));
@@ -29,14 +30,7 @@ const MainAppContent: React.FC = () => {
   const { currentPage, loading, refreshData, settings, userProfile } = useAuth();
 
   if (loading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-slate-950 text-slate-100">
-        <div className="flex flex-col items-center space-y-4">
-          <div className="w-12 h-12 rounded-2xl electric-gradient-btn animate-pulse glow-purple"></div>
-          <p className="text-xs font-bold text-slate-400 tracking-wider uppercase">Loading Veloura Quest Cloud...</p>
-        </div>
-      </div>
-    );
+    return <LoadingScreen />;
   }
 
   // Account Suspension Enforcement

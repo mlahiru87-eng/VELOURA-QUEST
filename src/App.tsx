@@ -29,7 +29,14 @@ const AdminPanelView = lazy(() => import('./views/AdminPanelView').then(m => ({ 
 const QuestCompleteView = lazy(() => import('./views/QuestCompleteView').then(m => ({ default: m.QuestCompleteView })));
 
 const MainAppContent: React.FC = () => {
-  const { currentPage, loading, refreshData, settings, userProfile } = useAuth();
+  const { currentPage, setCurrentPage, loading, refreshData, settings, userProfile } = useAuth();
+
+  React.useEffect(() => {
+    // Role-based protection: non-admins cannot stay on 'admin' page
+    if (userProfile && userProfile.role !== 'admin' && currentPage === 'admin') {
+      setCurrentPage('home');
+    }
+  }, [userProfile, currentPage, setCurrentPage]);
 
   if (loading) {
     return <LoadingScreen />;
@@ -46,6 +53,17 @@ const MainAppContent: React.FC = () => {
   }
 
   const isAuthPage = ['splash', 'login', 'register', 'forgotPassword'].includes(currentPage);
+
+  // Authenticated Admin Experience: dedicated admin layout without normal user earning/nav items
+  if (userProfile?.role === 'admin' && !isAuthPage) {
+    return (
+      <div id="admin-app-root" className="min-h-screen bg-slate-950 text-slate-100 font-sans selection:bg-purple-500/30 selection:text-purple-200">
+        <Suspense fallback={<DashboardSkeleton />}>
+          <AdminPanelView />
+        </Suspense>
+      </div>
+    );
+  }
 
   return (
     <div id="app-root" className="min-h-screen bg-slate-950 text-slate-100 flex flex-col font-sans selection:bg-purple-500/30 selection:text-purple-200">
@@ -68,7 +86,6 @@ const MainAppContent: React.FC = () => {
             {currentPage === 'support' && <SupportChatView />}
             {currentPage === 'notifications' && <NotificationsView />}
             {currentPage === 'profile' && <ProfileView />}
-            {currentPage === 'admin' && <AdminPanelView />}
             {currentPage === 'complete' && <QuestCompleteView />}
           </Suspense>
         </PullToRefresh>

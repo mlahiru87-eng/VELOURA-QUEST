@@ -2,9 +2,13 @@ import React, { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { useSupport } from '../context/SupportContext';
 import { useToast } from '../context/ToastContext';
-import { TaskItem, UserProfile, SystemSettings, WithdrawalRequest } from '../types';
-import { AnalyticsDashboard } from '../components/AnalyticsDashboard';
+import { TaskItem, UserProfile, SystemSettings, WithdrawalRequest, AdminTab } from '../types';
+import { AdminHeader } from '../components/AdminHeader';
+import { AdminSidebar } from '../components/AdminSidebar';
+import { AdminDashboardOverview } from '../components/AdminDashboardOverview';
 import { AdminSupportPanel } from '../components/AdminSupportPanel';
+import { AdminTransactionsView } from '../components/AdminTransactionsView';
+import { AdminReportsView } from '../components/AdminReportsView';
 import { UserTimelineModal } from '../components/UserTimelineModal';
 import { WalletAdjustmentModal } from '../components/WalletAdjustmentModal';
 import { exportUsersCSV, exportWithdrawalsCSV, exportTransactionsCSV } from '../lib/securityAndUtils';
@@ -66,7 +70,8 @@ export const AdminPanelView: React.FC = () => {
   const { unreadForAdminCount } = useSupport();
   const { showToast } = useToast();
 
-  const [adminTab, setAdminTab] = useState<'analytics' | 'users' | 'tasks' | 'withdrawals' | 'referrals' | 'support' | 'audit' | 'notifications' | 'settings'>('analytics');
+  const [adminTab, setAdminTab] = useState<AdminTab>('dashboard');
+  const [mobileMenuOpen, setMobileMenuOpen] = useState<boolean>(false);
 
   // Search & Filter state for users
   const [userSearch, setUserSearch] = useState('');
@@ -421,76 +426,51 @@ export const AdminPanelView: React.FC = () => {
   };
 
   return (
-    <div id="admin-panel" className="space-y-6 pb-20 md:pb-8">
-      {/* Admin Header */}
-      <div className="glass-panel p-6 sm:p-8 rounded-3xl border border-purple-500/30 relative overflow-hidden">
-        <div className="absolute top-0 right-0 w-80 h-80 bg-purple-600/20 rounded-full blur-3xl pointer-events-none"></div>
+    <div id="admin-panel" className="min-h-screen bg-slate-950 flex flex-col text-slate-100 selection:bg-purple-500/30 selection:text-purple-200">
+      {/* Dedicated Admin Header */}
+      <AdminHeader
+        currentTab={adminTab}
+        onSelectTab={setAdminTab}
+        mobileMenuOpen={mobileMenuOpen}
+        setMobileMenuOpen={setMobileMenuOpen}
+      />
 
-        <div className="relative z-10 flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
-          <div>
-            <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-amber-500/20 text-amber-300 border border-amber-500/30 uppercase tracking-wider">
-              <ShieldAlert className="w-3.5 h-3.5 text-amber-400" /> Administrative Command
-            </span>
-            <h2 className="text-2xl font-black text-slate-100 mt-2">Veloura Quest Management Studio</h2>
-            <p className="text-xs text-slate-400 mt-1">Manage users, audit wallet adjustments, approve cashouts, and view real-time analytics.</p>
-          </div>
+      <div className="flex-1 flex overflow-hidden">
+        {/* Dedicated Admin Sidebar / Mobile Drawer */}
+        <AdminSidebar
+          currentTab={adminTab}
+          onSelectTab={setAdminTab}
+          mobileMenuOpen={mobileMenuOpen}
+          setMobileMenuOpen={setMobileMenuOpen}
+        />
 
-          <div className="flex flex-wrap items-center gap-2">
-            <button
-              onClick={() => exportUsersCSV(allUsers)}
-              className="px-3.5 py-2 rounded-xl glass-panel hover:bg-slate-800 text-xs font-bold text-slate-200 border border-slate-700 inline-flex items-center gap-1.5"
-            >
-              <Download className="w-3.5 h-3.5 text-purple-400" /> Export Users CSV
-            </button>
-            <button
-              onClick={() => exportWithdrawalsCSV(allWithdrawals)}
-              className="px-3.5 py-2 rounded-xl glass-panel hover:bg-slate-800 text-xs font-bold text-slate-200 border border-slate-700 inline-flex items-center gap-1.5"
-            >
-              <Download className="w-3.5 h-3.5 text-emerald-400" /> Export Cashouts CSV
-            </button>
-            <button
-              onClick={() => exportTransactionsCSV(allTransactions)}
-              className="px-3.5 py-2 rounded-xl glass-panel hover:bg-slate-800 text-xs font-bold text-slate-200 border border-slate-700 inline-flex items-center gap-1.5"
-            >
-              <Download className="w-3.5 h-3.5 text-blue-400" /> Export Txs CSV
-            </button>
-          </div>
-        </div>
-      </div>
+        {/* Main Content Area */}
+        <main className="flex-1 overflow-y-auto p-4 sm:p-6 md:p-8 space-y-6 max-w-7xl mx-auto w-full pb-20 md:pb-12">
+          {/* Dashboard Tab */}
+          {adminTab === 'dashboard' && (
+            <AdminDashboardOverview
+              onNavigateTab={setAdminTab}
+              onOpenApproveModal={(w) => {
+                setSelectedWithdrawalForApprove(w);
+                setTxHashInput('');
+                setAdminNoteInput('');
+              }}
+              onOpenRejectModal={(w) => {
+                setSelectedWithdrawalForReject(w);
+                setRejectionReasonInput('');
+                setAdminNoteInput('');
+              }}
+            />
+          )}
 
-      {/* Admin Nav Tabs */}
-      <div className="flex items-center space-x-2 overflow-x-auto pb-2 scrollbar-none">
-        {[
-          { id: 'analytics', label: 'Analytics', icon: <TrendingUp className="w-4 h-4" /> },
-          { id: 'users', label: `Users (${allUsers.length})`, icon: <Users className="w-4 h-4" /> },
-          { id: 'tasks', label: `Tasks (${tasks.length})`, icon: <CheckSquare className="w-4 h-4" /> },
-          { id: 'withdrawals', label: `Cashouts (${allWithdrawals.filter(w=>w.status==='pending').length} pending)`, icon: <Wallet className="w-4 h-4" /> },
-          { id: 'support', label: `Support Chat${unreadForAdminCount > 0 ? ` (${unreadForAdminCount} new)` : ''}`, icon: <MessageSquare className="w-4 h-4" /> },
-          { id: 'referrals', label: 'Referral Commissions', icon: <DollarSign className="w-4 h-4" /> },
-          { id: 'audit', label: `Audit Logs (${auditLogs.length})`, icon: <FileText className="w-4 h-4" /> },
-          { id: 'notifications', label: 'Announcements', icon: <Bell className="w-4 h-4" /> },
-          { id: 'settings', label: 'System Settings', icon: <Settings className="w-4 h-4" /> },
-        ].map((tab) => (
-          <button
-            key={tab.id}
-            onClick={() => setAdminTab(tab.id as any)}
-            className={`px-4 py-2.5 rounded-xl text-xs font-bold whitespace-nowrap inline-flex items-center gap-2 transition-all ${
-              adminTab === tab.id
-                ? 'electric-gradient-btn text-white shadow-md glow-purple'
-                : 'glass-panel text-slate-400 hover:text-slate-200'
-            }`}
-          >
-            {tab.icon}
-            <span>{tab.label}</span>
-          </button>
-        ))}
-      </div>
+          {/* Support Chat Tab */}
+          {adminTab === 'support' && <AdminSupportPanel />}
 
-      {/* Analytics Tab */}
-      {adminTab === 'analytics' && <AnalyticsDashboard />}
+          {/* Transactions Tab */}
+          {adminTab === 'transactions' && <AdminTransactionsView />}
 
-      {/* Support Chat Tab */}
-      {adminTab === 'support' && <AdminSupportPanel />}
+          {/* Reports & Audits Tab */}
+          {adminTab === 'reports' && <AdminReportsView />}
 
       {/* Users Tab */}
       {adminTab === 'users' && (
@@ -1182,39 +1162,6 @@ export const AdminPanelView: React.FC = () => {
         </div>
       )}
 
-      {/* Audit Logs Tab */}
-      {adminTab === 'audit' && (
-        <div className="glass-panel p-6 rounded-3xl border border-slate-800 space-y-4">
-          <h3 className="text-sm font-bold text-slate-100 flex items-center gap-2">
-            <FileText className="w-4 h-4 text-purple-400" /> Administrative Audit Log Ledger
-          </h3>
-
-          <div className="space-y-2">
-            {auditLogs.length === 0 ? (
-              <div className="text-center py-12 text-slate-500 text-xs">No admin audit logs recorded yet.</div>
-            ) : (
-              auditLogs.map((log) => (
-                <div key={log.id} className="p-3.5 rounded-xl bg-slate-900/60 border border-slate-800 flex items-center justify-between">
-                  <div>
-                    <div className="flex items-center space-x-2">
-                      <span className="text-xs font-bold text-slate-200 uppercase">{log.action}</span>
-                      <span className="text-[10px] text-slate-400">Target: {log.targetUserEmail}</span>
-                    </div>
-                    <p className="text-[11px] text-slate-400 mt-0.5">
-                      Reason: "{log.reason}" • Executed by {log.adminEmail}
-                    </p>
-                  </div>
-
-                  <span className="text-[10px] text-slate-500 font-mono">
-                    {new Date(log.createdAt).toLocaleDateString()} {new Date(log.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                  </span>
-                </div>
-              ))
-            )}
-          </div>
-        </div>
-      )}
-
       {/* Announcements Tab */}
       {adminTab === 'notifications' && (
         <div className="glass-panel p-6 rounded-3xl border border-slate-800 space-y-4 max-w-xl">
@@ -1536,6 +1483,8 @@ export const AdminPanelView: React.FC = () => {
           </div>
         </div>
       )}
+        </main>
+      </div>
 
       {/* User Timeline Modal */}
       {timelineUser && (

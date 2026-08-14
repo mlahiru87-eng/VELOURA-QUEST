@@ -23,22 +23,13 @@ export const Navbar: React.FC = () => {
 
   const navItems: { page: PageView; label: string; icon: React.ReactNode; badge?: number }[] = [
     { page: 'home', label: 'Home', icon: <LayoutDashboard className="w-5 h-5" /> },
-    { page: 'tasks', label: 'Quests', icon: <CheckSquare className="w-5 h-5" /> },
+    { page: 'tasks', label: 'Daily Tasks', icon: <CheckSquare className="w-5 h-5" /> },
     { page: 'wallet', label: 'Wallet', icon: <Wallet className="w-5 h-5" /> },
     { page: 'referral', label: 'Referral', icon: <Users className="w-5 h-5" /> },
     { page: 'support', label: 'Support', icon: <MessageSquare className="w-5 h-5" />, badge: unreadForUserCount },
     { page: 'notifications', label: 'Alerts', icon: <Bell className="w-5 h-5" />, badge: unreadCount },
     { page: 'profile', label: 'Profile', icon: <User className="w-5 h-5" /> },
   ];
-
-  if (userProfile?.role === 'admin') {
-    navItems.push({ 
-      page: 'admin', 
-      label: 'Admin', 
-      icon: <ShieldCheck className="w-5 h-5 text-rose-400" />,
-      badge: unreadForAdminCount > 0 ? unreadForAdminCount : undefined
-    });
-  }
 
   return (
     <>

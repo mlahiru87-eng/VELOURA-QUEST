@@ -13,6 +13,18 @@ export type PageView =
   | 'admin'
   | 'complete';
 
+export type AdminTab = 
+  | 'dashboard'
+  | 'users'
+  | 'tasks'
+  | 'withdrawals'
+  | 'support'
+  | 'referrals'
+  | 'transactions'
+  | 'notifications'
+  | 'reports'
+  | 'settings';
+
 export interface SupportMessage {
   id?: string;
   messageId: string;

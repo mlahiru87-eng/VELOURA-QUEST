@@ -8,9 +8,42 @@ export type PageView =
   | 'wallet' 
   | 'referral' 
   | 'notifications' 
+  | 'support'
   | 'profile' 
   | 'admin'
   | 'complete';
+
+export interface SupportMessage {
+  id?: string;
+  messageId: string;
+  chatId: string;
+  senderId: string;
+  senderRole: 'user' | 'admin';
+  senderName?: string;
+  senderPhotoURL?: string;
+  message: string;
+  createdAt: string;
+  read: boolean;
+}
+
+export interface SupportChat {
+  id?: string;
+  chatId: string;
+  userId: string;
+  userName: string;
+  userEmail: string;
+  userPhotoURL?: string;
+  status: 'open' | 'closed';
+  createdAt: string;
+  updatedAt: string;
+  lastMessage: string;
+  lastMessageAt: string;
+  lastSenderRole?: 'user' | 'admin';
+  unreadForAdmin: number;
+  unreadForUser: number;
+  closedAt?: string;
+  closedBy?: string;
+}
 
 export interface UserProfile {
   uid: string;
@@ -35,12 +68,13 @@ export interface UserProfile {
 export interface TaskItem {
   id: string;
   title: string;
-  description: string;
+  description?: string;
   reward: number;
-  thumbnailUrl: string;
-  videoUrl: string;
-  duration: number;
-  category: 'Video' | 'Survey' | 'Game Quest' | 'App Install' | 'Special' | string;
+  thumbnailUrl?: string;
+  videoUrl?: string;
+  adUrl?: string;
+  duration?: number;
+  category: 'Video' | 'Ads' | 'Survey' | 'Game Quest' | 'App Install' | 'Special' | string;
   createdAt: string;
   active?: boolean;
   // Aliases for component convenience
@@ -53,9 +87,14 @@ export interface TaskSession {
   sessionId: string;
   taskId: string;
   userId: string;
-  status: 'started' | 'completed' | 'abandoned';
+  status: 'started' | 'completed' | 'failed' | 'abandoned';
   startedAt: any;
+  requiredSeconds?: number;
+  category?: 'Video' | 'Ads' | string;
   completedAt?: string;
+  failedAt?: string;
+  failedReason?: string;
+  rewardStatus?: 'pending' | 'credited';
 }
 
 export interface TaskCompletion {

@@ -134,6 +134,42 @@
         "referralBonus": { "type": "number" },
         "maintenanceMode": { "type": "boolean" }
       }
+    },
+    "supportChats": {
+      "title": "supportChats",
+      "description": "User support chat threads",
+      "type": "object",
+      "properties": {
+        "chatId": { "type": "string" },
+        "userId": { "type": "string" },
+        "userName": { "type": "string" },
+        "userEmail": { "type": "string" },
+        "status": { "type": "string", "enum": ["open", "closed"] },
+        "createdAt": { "type": "string" },
+        "updatedAt": { "type": "string" },
+        "lastMessage": { "type": "string" },
+        "lastMessageAt": { "type": "string" },
+        "lastSenderRole": { "type": "string", "enum": ["user", "admin"] },
+        "unreadForAdmin": { "type": "number" },
+        "unreadForUser": { "type": "number" }
+      },
+      "required": ["chatId", "userId", "status", "createdAt"]
+    },
+    "supportMessages": {
+      "title": "supportMessages",
+      "description": "Messages within a user support chat thread",
+      "type": "object",
+      "properties": {
+        "messageId": { "type": "string" },
+        "chatId": { "type": "string" },
+        "senderId": { "type": "string" },
+        "senderRole": { "type": "string", "enum": ["user", "admin"] },
+        "senderName": { "type": "string" },
+        "message": { "type": "string" },
+        "createdAt": { "type": "string" },
+        "read": { "type": "boolean" }
+      },
+      "required": ["messageId", "chatId", "senderId", "senderRole", "message", "createdAt"]
     }
   },
   "firestore": {
@@ -168,6 +204,14 @@
     "/notifications/{notificationId}": {
       "schema": { "$ref": "#/entities/notifications" },
       "description": "Notification records"
+    },
+    "/supportChats/{chatId}": {
+      "schema": { "$ref": "#/entities/supportChats" },
+      "description": "Support chat conversations"
+    },
+    "/supportChats/{chatId}/messages/{messageId}": {
+      "schema": { "$ref": "#/entities/supportMessages" },
+      "description": "Support messages subcollection"
     },
     "/settings/{settingId}": {
       "schema": { "$ref": "#/entities/settings" },

@@ -85,6 +85,31 @@ service cloud.firestore {
       allow write: if isSignedIn();
     }
 
+    // Support Chats
+    match /supportChats/{chatId} {
+      allow read: if isSignedIn() && (resource.data.userId == request.auth.uid || isAdmin());
+      allow create: if isSignedIn() && request.resource.data.userId == request.auth.uid;
+      allow update: if isSignedIn() && (resource.data.userId == request.auth.uid || isAdmin());
+      allow delete: if isAdmin();
+
+      // Support Chat Messages subcollection
+      match /messages/{messageId} {
+        allow read: if isSignedIn() && (
+          get(/databases/$(database)/documents/supportChats/$(chatId)).data.userId == request.auth.uid ||
+          isAdmin()
+        );
+        allow create: if isSignedIn() && (
+          (request.resource.data.senderRole == 'user' && request.resource.data.senderId == request.auth.uid && get(/databases/$(database)/documents/supportChats/$(chatId)).data.userId == request.auth.uid) ||
+          (request.resource.data.senderRole == 'admin' && isAdmin())
+        );
+        allow update: if isSignedIn() && (
+          get(/databases/$(database)/documents/supportChats/$(chatId)).data.userId == request.auth.uid ||
+          isAdmin()
+        );
+        allow delete: if isAdmin();
+      }
+    }
+
     // Audit logs
     match /auditLogs/{logId} {
       allow read: if isSignedIn();

@@ -298,19 +298,24 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           const raw = d.data();
           const reward = typeof raw.reward === 'number' ? raw.reward : (typeof raw.rewardAmount === 'number' ? raw.rewardAmount : 5.0);
           const duration = typeof raw.duration === 'number' ? raw.duration : (typeof raw.durationSeconds === 'number' ? raw.durationSeconds : 30);
-          const thumbnailUrl = raw.thumbnailUrl || raw.thumbnail || 'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?w=500&auto=format&fit=crop&q=80';
-          const videoUrl = raw.videoUrl || 'https://veloura-etez.vercel.app/video/Lwq20xe9n2eLnBbQqzjC';
+          const isAds = raw.category === 'Ads';
+          const defaultAdThumb = 'https://images.unsplash.com/photo-1557804506-669a67965ba0?w=500&auto=format&fit=crop&q=80';
+          const defaultVideoThumb = 'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?w=500&auto=format&fit=crop&q=80';
+          const thumbnailUrl = raw.thumbnailUrl || raw.thumbnail || (isAds ? defaultAdThumb : defaultVideoThumb);
+          const videoUrl = raw.videoUrl || (isAds ? '' : 'https://veloura-etez.vercel.app/video/Lwq20xe9n2eLnBbQqzjC');
+          const adUrl = raw.adUrl || '';
           const createdAt = raw.createdAt || new Date().toISOString();
 
           loadedTasks.push({
             id: d.id,
-            title: raw.title || 'Untitled Quest',
-            description: raw.description || '',
+            title: raw.title || (isAds ? 'Advertisement Task' : 'Untitled Quest'),
+            description: raw.description || (isAds ? 'Visit the advertisement and stay on the page for 30 seconds.' : ''),
             reward,
             rewardAmount: reward,
             thumbnailUrl,
             thumbnail: thumbnailUrl,
             videoUrl,
+            adUrl,
             duration,
             durationSeconds: duration,
             category: raw.category || 'Video',
@@ -1039,43 +1044,61 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   };
 
-  // External Video Task Support - Start Session
+  // External Video & Ads Task Support - Start Session
   const startTaskSession = async (taskId: string): Promise<{ success: boolean; redirectUrl?: string; sessionId?: string; message?: string }> => {
     if (!currentUser || !userProfile) {
       return { success: false, message: 'Please log in to start this quest' };
     }
 
     try {
-      // 1. Read the task's videoUrl and duration from Firestore
-      let videoUrl = 'https://veloura-etez.vercel.app/video/Lwq20xe9n2eLnBbQqzjC';
-      let duration = 30;
+      // 1. Read the task details from Firestore or memory
+      let targetDestination = 'https://veloura-etez.vercel.app/video/Lwq20xe9n2eLnBbQqzjC';
+      let requiredDuration = 30;
+      let taskCategory = 'Video';
+
       try {
         telemetry.recordFirestoreRead();
         const taskRef = doc(db, 'tasks', taskId);
         const taskSnap = await getDoc(taskRef);
         if (taskSnap.exists()) {
           const tData = taskSnap.data();
-          if (tData.videoUrl) {
-            videoUrl = tData.videoUrl;
-          }
-          if (typeof tData.duration === 'number') {
-            duration = tData.duration;
-          } else if (typeof tData.durationSeconds === 'number') {
-            duration = tData.durationSeconds;
+          taskCategory = tData.category || 'Video';
+          if (taskCategory === 'Ads' || tData.adUrl) {
+            taskCategory = 'Ads';
+            targetDestination = tData.adUrl || 'https://example.com/advertisement';
+            requiredDuration = 30;
+          } else {
+            if (tData.videoUrl) targetDestination = tData.videoUrl;
+            if (typeof tData.duration === 'number') requiredDuration = tData.duration;
+            else if (typeof tData.durationSeconds === 'number') requiredDuration = tData.durationSeconds;
           }
         } else {
           const memTask = tasks.find((t) => t.id === taskId);
           if (memTask) {
-            if (memTask.videoUrl) videoUrl = memTask.videoUrl;
-            if (memTask.durationSeconds) duration = memTask.durationSeconds;
+            taskCategory = memTask.category || 'Video';
+            if (taskCategory === 'Ads' || memTask.adUrl) {
+              taskCategory = 'Ads';
+              targetDestination = memTask.adUrl || 'https://example.com/advertisement';
+              requiredDuration = 30;
+            } else {
+              if (memTask.videoUrl) targetDestination = memTask.videoUrl;
+              if (memTask.durationSeconds) requiredDuration = memTask.durationSeconds;
+            }
           }
         }
       } catch (e) {
         console.warn('Could not read task directly from Firestore, falling back to loaded state', e);
         const memTask = tasks.find((t) => t.id === taskId);
         if (memTask) {
-          if (memTask.videoUrl) videoUrl = memTask.videoUrl;
-          if (memTask.durationSeconds) duration = memTask.durationSeconds;
+          taskCategory = memTask.category || 'Video';
+          if (taskCategory === 'Ads' || memTask.adUrl) {
+            taskCategory = 'Ads';
+            targetDestination = memTask.adUrl || 'https://example.com/advertisement';
+            requiredDuration = 30;
+          } else {
+            if (memTask.videoUrl) targetDestination = memTask.videoUrl;
+            if (memTask.durationSeconds) requiredDuration = memTask.durationSeconds;
+          }
         }
       }
 
@@ -1090,7 +1113,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         userId: userProfile.uid,
         status: 'started',
         startedAt: serverTimestamp(),
-        requiredSeconds: duration || 30
+        requiredSeconds: requiredDuration || 30,
+        category: taskCategory
       };
 
       await setDoc(sessionRef, sessionPayload);
@@ -1098,17 +1122,17 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
       // Store in localStorage so if the user hits Back or reopens, we resume session verification
       try {
-        localStorage.setItem('active_task_session', JSON.stringify({ taskId, sessionId, startedAt: Date.now() }));
+        localStorage.setItem('active_task_session', JSON.stringify({ taskId, sessionId, category: taskCategory, startedAt: Date.now() }));
       } catch (e) {
         // ignore
       }
 
-      // 4. Redirect the user to videoUrl with query params appended
+      // 4. Prepare redirect URL with query params
       let targetUrl: URL;
       try {
-        targetUrl = new URL(videoUrl);
+        targetUrl = new URL(targetDestination);
       } catch {
-        targetUrl = new URL(videoUrl, window.location.origin);
+        targetUrl = new URL(targetDestination, window.location.origin);
       }
 
       targetUrl.searchParams.set('taskId', taskId);
@@ -1132,11 +1156,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   // Admin Methods
   const addNewTask = async (taskData: Omit<TaskItem, 'id'> | {
     title: string;
-    description: string;
+    description?: string;
     reward: number;
-    thumbnailUrl: string;
-    videoUrl: string;
-    duration: number;
+    thumbnailUrl?: string;
+    videoUrl?: string;
+    adUrl?: string;
+    duration?: number;
     category: string;
     createdAt?: string;
     active?: boolean;
@@ -1150,20 +1175,34 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         throw new Error("Minimum task reward is 0.01 USDT.");
       }
 
-      const thumbnailUrl = (taskData as any).thumbnailUrl || (taskData as any).thumbnail;
-      const duration = (taskData as any).duration !== undefined ? (taskData as any).duration : (taskData as any).durationSeconds;
+      const isAds = taskData.category === 'Ads';
+      let payload: any;
 
-      const payload = {
-        title: taskData.title,
-        description: taskData.description,
-        reward,
-        thumbnailUrl,
-        videoUrl: (taskData as any).videoUrl || 'https://veloura-etez.vercel.app/video/Lwq20xe9n2eLnBbQqzjC',
-        duration,
-        category: taskData.category,
-        createdAt,
-        active: taskData.active !== undefined ? taskData.active : true
-      };
+      if (isAds) {
+        payload = {
+          title: taskData.title?.trim() || 'Advertisement Task',
+          category: 'Ads',
+          reward,
+          adUrl: (taskData as any).adUrl?.trim() || '',
+          createdAt,
+          active: taskData.active !== undefined ? taskData.active : true
+        };
+      } else {
+        const thumbnailUrl = (taskData as any).thumbnailUrl || (taskData as any).thumbnail || 'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?w=500&auto=format&fit=crop&q=80';
+        const duration = (taskData as any).duration !== undefined ? (taskData as any).duration : ((taskData as any).durationSeconds || 30);
+
+        payload = {
+          title: taskData.title?.trim() || 'Veloura Video Quest',
+          description: taskData.description || 'Veloura Quest',
+          reward,
+          thumbnailUrl,
+          videoUrl: (taskData as any).videoUrl || 'https://veloura-etez.vercel.app/video/Lwq20xe9n2eLnBbQqzjC',
+          duration,
+          category: taskData.category || 'Video',
+          createdAt,
+          active: taskData.active !== undefined ? taskData.active : true
+        };
+      }
 
       const docRef = await addDoc(collection(db, 'tasks'), payload);
       telemetry.recordFirestoreWrite();
@@ -1172,8 +1211,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         id: docRef.id,
         ...payload,
         rewardAmount: reward,
-        thumbnail: thumbnailUrl,
-        durationSeconds: duration
+        thumbnail: payload.thumbnailUrl || (isAds ? 'https://images.unsplash.com/photo-1557804506-669a67965ba0?w=500&auto=format&fit=crop&q=80' : undefined),
+        durationSeconds: isAds ? 30 : (payload.duration || 30)
       };
       setTasks([...tasks, newTask]);
     } catch (err) {

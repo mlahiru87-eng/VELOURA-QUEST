@@ -76,6 +76,21 @@ export const INITIAL_TASKS: TaskItem[] = [
     createdAt: new Date().toISOString(),
     active: true,
   },
+  {
+    id: 'task-ad-1',
+    title: 'Visit CyberEdge Cloud Partner Offer',
+    description: 'Visit our sponsor CyberEdge Cloud for 30 seconds to earn instant Veloura cash rewards.',
+    reward: 7.50,
+    rewardAmount: 7.50,
+    thumbnailUrl: 'https://images.unsplash.com/photo-1451187580459-43490279c0fa?w=500&auto=format&fit=crop&q=80',
+    thumbnail: 'https://images.unsplash.com/photo-1451187580459-43490279c0fa?w=500&auto=format&fit=crop&q=80',
+    adUrl: 'https://example.com/advertisement',
+    duration: 30,
+    durationSeconds: 30,
+    category: 'Ads',
+    createdAt: new Date().toISOString(),
+    active: true,
+  },
 ];
 
 export const INITIAL_NOTIFICATIONS: NotificationItem[] = [

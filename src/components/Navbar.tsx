@@ -1,5 +1,6 @@
 import React from 'react';
 import { useAuth } from '../context/AuthContext';
+import { useSupport } from '../context/SupportContext';
 import { 
   LayoutDashboard, 
   CheckSquare, 
@@ -9,12 +10,14 @@ import {
   User, 
   ShieldCheck, 
   LogOut,
-  Zap
+  Zap,
+  MessageSquare
 } from 'lucide-react';
 import { PageView } from '../types';
 
 export const Navbar: React.FC = () => {
   const { currentPage, setCurrentPage, userProfile, notifications, logout } = useAuth();
+  const { unreadForUserCount, unreadForAdminCount } = useSupport();
 
   const unreadCount = notifications.filter(n => !n.read).length;
 
@@ -23,12 +26,18 @@ export const Navbar: React.FC = () => {
     { page: 'tasks', label: 'Quests', icon: <CheckSquare className="w-5 h-5" /> },
     { page: 'wallet', label: 'Wallet', icon: <Wallet className="w-5 h-5" /> },
     { page: 'referral', label: 'Referral', icon: <Users className="w-5 h-5" /> },
+    { page: 'support', label: 'Support', icon: <MessageSquare className="w-5 h-5" />, badge: unreadForUserCount },
     { page: 'notifications', label: 'Alerts', icon: <Bell className="w-5 h-5" />, badge: unreadCount },
     { page: 'profile', label: 'Profile', icon: <User className="w-5 h-5" /> },
   ];
 
   if (userProfile?.role === 'admin') {
-    navItems.push({ page: 'admin', label: 'Admin', icon: <ShieldCheck className="w-5 h-5 text-rose-400" /> });
+    navItems.push({ 
+      page: 'admin', 
+      label: 'Admin', 
+      icon: <ShieldCheck className="w-5 h-5 text-rose-400" />,
+      badge: unreadForAdminCount > 0 ? unreadForAdminCount : undefined
+    });
   }
 
   return (

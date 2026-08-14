@@ -18,7 +18,9 @@ import {
   Check,
   Flame,
   Lock,
-  ShieldCheck
+  ShieldCheck,
+  Megaphone,
+  Film
 } from 'lucide-react';
 
 export const HomeDashboardView: React.FC = () => {
@@ -202,20 +204,44 @@ export const HomeDashboardView: React.FC = () => {
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
           {daily5Tasks.map((task) => {
             const isCompleted = completedTaskIds.has(task.id);
+            const isAd = task.category === 'Ads';
+            const rewardVal = task.reward ?? task.rewardAmount ?? 0;
+            const durationVal = task.duration ?? task.durationSeconds ?? 30;
+
             return (
               <div
                 key={task.id}
-                className="glass-panel rounded-2xl overflow-hidden border border-slate-800/80 hover:border-purple-500/40 transition-all p-4 flex flex-col justify-between space-y-3"
+                className={`glass-panel rounded-2xl overflow-hidden border transition-all p-4 flex flex-col justify-between space-y-3 ${
+                  isCompleted
+                    ? 'border-emerald-500/30 bg-slate-900/60'
+                    : isAd
+                    ? 'border-amber-500/30 hover:border-amber-500/60 bg-gradient-to-br from-slate-900/90 to-amber-950/20'
+                    : 'border-slate-800/80 hover:border-purple-500/40'
+                }`}
               >
                 <div className="flex space-x-3">
-                  <img
-                    src={task.thumbnail}
-                    alt={task.title}
-                    className="w-16 h-16 rounded-xl object-cover border border-slate-700 shrink-0"
-                  />
+                  {task.thumbnailUrl || task.thumbnail ? (
+                    <img
+                      src={task.thumbnailUrl || task.thumbnail}
+                      alt={task.title}
+                      className="w-16 h-16 rounded-xl object-cover border border-slate-700 shrink-0"
+                    />
+                  ) : (
+                    <div className={`w-16 h-16 rounded-xl flex items-center justify-center border shrink-0 ${
+                      isAd 
+                        ? 'bg-amber-500/20 border-amber-500/30 text-amber-300' 
+                        : 'bg-purple-500/20 border-purple-500/30 text-purple-300'
+                    }`}>
+                      {isAd ? <Megaphone className="w-6 h-6 text-amber-400" /> : <Film className="w-6 h-6 text-purple-400" />}
+                    </div>
+                  )}
                   <div className="min-w-0 flex-1">
-                    <span className="text-[10px] font-bold uppercase tracking-wider text-purple-400 bg-purple-500/10 px-2 py-0.5 rounded border border-purple-500/20">
-                      {task.category}
+                    <span className={`text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded border ${
+                      isAd 
+                        ? 'text-amber-300 bg-amber-500/20 border-amber-500/30' 
+                        : 'text-purple-400 bg-purple-500/10 border-purple-500/20'
+                    }`}>
+                      {isAd ? '📢 Ads' : task.category}
                     </span>
                     <h4 className="text-xs font-bold text-slate-100 mt-1 line-clamp-1">{task.title}</h4>
                   </div>
@@ -223,9 +249,9 @@ export const HomeDashboardView: React.FC = () => {
 
                 <div className="flex items-center justify-between pt-2 border-t border-slate-800/80">
                   <div className="flex items-center space-x-2">
-                    <span className="text-xs font-extrabold text-emerald-400">${task.rewardAmount.toFixed(2)}</span>
+                    <span className="text-xs font-extrabold text-emerald-400">${rewardVal.toFixed(2)}</span>
                     <span className="text-[10px] text-slate-500 flex items-center gap-0.5">
-                      <Clock className="w-3 h-3" /> {task.durationSeconds}s
+                      <Clock className="w-3 h-3" /> {durationVal}s
                     </span>
                   </div>
 
@@ -236,9 +262,13 @@ export const HomeDashboardView: React.FC = () => {
                   ) : (
                     <button
                       onClick={() => setSelectedTask(task)}
-                      className="px-3 py-1.5 rounded-xl electric-gradient-btn text-xs font-bold text-white shadow-md inline-flex items-center gap-1 hover:scale-105 transition-transform"
+                      className={`px-3 py-1.5 rounded-xl text-xs font-bold text-white shadow-md inline-flex items-center gap-1 hover:scale-105 transition-transform ${
+                        isAd 
+                          ? 'bg-gradient-to-r from-amber-500 to-rose-600 hover:from-amber-400 hover:to-rose-500 glow-amber' 
+                          : 'electric-gradient-btn'
+                      }`}
                     >
-                      <Play className="w-3.5 h-3.5 fill-white" /> Start Task
+                      <Play className="w-3.5 h-3.5 fill-white" /> {isAd ? 'Start Ad' : 'Start Task'}
                     </button>
                   )}
                 </div>

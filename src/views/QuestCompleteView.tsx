@@ -91,10 +91,13 @@ export const QuestCompleteView: React.FC = () => {
         return;
       }
 
+      const isAd = sessionData.category === 'Ads';
+      const targetText = isAd ? 'advertisement' : 'task';
+
       if (sessionData.status === 'failed' || sessionData.status === 'expired') {
         setStatusState('error');
         setErrorType('too_early');
-        setErrorMessage('You left the task too early. Please stay on the task page for 30 seconds.');
+        setErrorMessage(`You left the task too early. Please stay on the ${targetText} page for 30 seconds.`);
         setVerifying(false);
         return;
       }
@@ -128,7 +131,7 @@ export const QuestCompleteView: React.FC = () => {
         setStatusState('error');
         setErrorType('too_early');
         setElapsedTimeInfo({ spent: elapsedSeconds, required: requiredSeconds });
-        setErrorMessage('You left the task too early. Please stay on the task page for 30 seconds.');
+        setErrorMessage(`You left the task too early. Please stay on the ${targetText} page for ${requiredSeconds} seconds.`);
         setVerifying(false);
         return;
       }
@@ -422,7 +425,9 @@ export const QuestCompleteView: React.FC = () => {
                 You left the task too early.
               </h1>
               <p className="text-xs text-slate-300 mt-2 max-w-sm leading-relaxed">
-                Please stay on the task page for at least 30 seconds to earn your reward.
+                {taskInfo?.category === 'Ads'
+                  ? 'Please stay on the advertisement page for 30 seconds.'
+                  : 'Please stay on the task page for at least 30 seconds.'}
               </p>
             </div>
 
@@ -445,7 +450,7 @@ export const QuestCompleteView: React.FC = () => {
                 className="w-full py-4 rounded-xl bg-gradient-to-r from-rose-600 to-amber-600 hover:from-rose-500 hover:to-amber-500 text-sm font-extrabold text-white shadow-xl transition-all flex items-center justify-center gap-2"
               >
                 <RefreshCw className="w-4 h-4" />
-                <span>Try Again (Start Task Again)</span>
+                <span>Start Task Again</span>
               </button>
 
               <button

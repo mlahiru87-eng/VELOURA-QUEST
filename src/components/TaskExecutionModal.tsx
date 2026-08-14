@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { TaskItem } from '../types';
 import { useAuth } from '../context/AuthContext';
-import { X, Play, CheckCircle2, Sparkles, Clock, DollarSign, ShieldCheck, AlertCircle, RefreshCw } from 'lucide-react';
+import { X, Play, CheckCircle2, Sparkles, Clock, DollarSign, ShieldCheck, AlertCircle, RefreshCw, Megaphone, Film } from 'lucide-react';
 
 interface TaskExecutionModalProps {
   task: TaskItem | null;
@@ -58,6 +58,8 @@ export const TaskExecutionModal: React.FC<TaskExecutionModalProps> = ({ task, on
 
   if (!task) return null;
 
+  const isAd = task.category === 'Ads';
+
   const handleStartTask = async () => {
     if (isStarting || timerRunning) return;
     setIsStarting(true);
@@ -102,17 +104,27 @@ export const TaskExecutionModal: React.FC<TaskExecutionModalProps> = ({ task, on
 
   return (
     <div id="task-modal-overlay" className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/85 backdrop-blur-md animate-fade-in">
-      <div className="relative w-full max-w-lg glass-panel rounded-3xl p-6 sm:p-8 border border-rose-500/40 shadow-2xl space-y-6 overflow-hidden">
+      <div className={`relative w-full max-w-lg glass-panel rounded-3xl p-6 sm:p-8 border shadow-2xl space-y-6 overflow-hidden ${
+        isAd ? 'border-amber-500/40' : 'border-rose-500/40'
+      }`}>
         {/* Glow ambient background elements */}
-        <div className="absolute -top-20 -right-20 w-40 h-40 bg-rose-600/25 rounded-full blur-3xl pointer-events-none"></div>
-        <div className="absolute -bottom-20 -left-20 w-40 h-40 bg-red-600/20 rounded-full blur-3xl pointer-events-none"></div>
+        <div className={`absolute -top-20 -right-20 w-40 h-40 rounded-full blur-3xl pointer-events-none ${
+          isAd ? 'bg-amber-600/25' : 'bg-rose-600/25'
+        }`}></div>
+        <div className={`absolute -bottom-20 -left-20 w-40 h-40 rounded-full blur-3xl pointer-events-none ${
+          isAd ? 'bg-rose-600/20' : 'bg-red-600/20'
+        }`}></div>
 
         {/* Modal Header */}
         <div className="flex items-start justify-between relative z-10">
           <div>
-            <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-rose-500/20 text-rose-300 border border-rose-500/30">
-              <Sparkles className="w-3.5 h-3.5 text-rose-400" />
-              {task.category} Quest
+            <span className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold border ${
+              isAd 
+                ? 'bg-amber-500/20 text-amber-300 border-amber-500/30' 
+                : 'bg-rose-500/20 text-rose-300 border-rose-500/30'
+            }`}>
+              {isAd ? <Megaphone className="w-3.5 h-3.5 text-amber-400" /> : <Sparkles className="w-3.5 h-3.5 text-rose-400" />}
+              {isAd ? 'Ads Task' : `${task.category} Quest`}
             </span>
             <h3 className="text-xl font-bold text-slate-100 mt-2">{task.title}</h3>
           </div>
@@ -126,20 +138,45 @@ export const TaskExecutionModal: React.FC<TaskExecutionModalProps> = ({ task, on
 
         {/* Thumbnail Preview / Task Display */}
         <div className="relative rounded-2xl overflow-hidden aspect-video border border-slate-700/60 group">
-          <img
-            src={task.thumbnailUrl || task.thumbnail}
-            alt={task.title}
-            className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
-          />
-          <div className="absolute inset-0 bg-gradient-to-t from-slate-950 via-slate-950/40 to-transparent"></div>
+          {task.thumbnailUrl || task.thumbnail ? (
+            <img
+              src={task.thumbnailUrl || task.thumbnail}
+              alt={task.title}
+              className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
+            />
+          ) : (
+            <div className={`w-full h-full flex flex-col items-center justify-center p-6 text-center ${
+              isAd 
+                ? 'bg-gradient-to-br from-slate-900 via-amber-950/40 to-slate-900' 
+                : 'bg-gradient-to-br from-slate-900 via-purple-950/40 to-slate-900'
+            }`}>
+              {isAd ? (
+                <>
+                  <div className="w-16 h-16 rounded-2xl bg-amber-500/20 border border-amber-500/40 flex items-center justify-center text-amber-400 mb-3 shadow-lg">
+                    <Megaphone className="w-8 h-8" />
+                  </div>
+                  <h4 className="text-base font-bold text-slate-200">Sponsored Advertisement</h4>
+                  <p className="text-xs text-slate-400 mt-1 max-w-xs">Stay on the sponsor page for 30 seconds</p>
+                </>
+              ) : (
+                <>
+                  <div className="w-16 h-16 rounded-2xl bg-purple-500/20 border border-purple-500/40 flex items-center justify-center text-purple-400 mb-3 shadow-lg">
+                    <Film className="w-8 h-8" />
+                  </div>
+                  <h4 className="text-base font-bold text-slate-200">{task.title}</h4>
+                </>
+              )}
+            </div>
+          )}
+          <div className="absolute inset-0 bg-gradient-to-t from-slate-950 via-slate-950/40 to-transparent pointer-events-none"></div>
 
-          <div className="absolute bottom-4 left-4 right-4 flex items-center justify-between text-xs font-semibold">
+          <div className="absolute bottom-4 left-4 right-4 flex items-center justify-between text-xs font-semibold z-10">
             <span className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg bg-slate-900/90 text-amber-400 border border-amber-500/30 backdrop-blur-md">
               <DollarSign className="w-4 h-4" /> Reward: ${rewardVal.toFixed(2)}
             </span>
 
             <span className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg bg-slate-900/90 text-blue-400 border border-blue-500/30 backdrop-blur-md">
-              <Clock className="w-4 h-4" /> 30s Task Visit
+              <Clock className="w-4 h-4" /> 30s {isAd ? 'Ad Visit' : 'Task Visit'}
             </span>
           </div>
         </div>
@@ -154,14 +191,16 @@ export const TaskExecutionModal: React.FC<TaskExecutionModalProps> = ({ task, on
                 <span>Try Again</span>
               </div>
               <p className="text-xs leading-relaxed text-rose-200/90">
-                You left the task page too early! Please stay on the task page for the full 30 seconds to unlock your reward.
+                {isAd 
+                  ? 'You left the advertisement page too early! Please stay on the ad page for the full 30 seconds to unlock your reward.'
+                  : 'You left the task page too early! Please stay on the task page for the full 30 seconds to unlock your reward.'}
               </p>
               <button
                 onClick={handleStartTask}
                 className="mt-1 py-2 px-4 rounded-xl bg-rose-600 hover:bg-rose-500 text-white font-bold text-xs flex items-center gap-1.5 transition-all shadow-md"
               >
                 <RefreshCw className="w-3.5 h-3.5" />
-                <span>Try Again (Start Task Again)</span>
+                <span>Try Again ({isAd ? 'Start Ad Again' : 'Start Task Again'})</span>
               </button>
             </div>
           )}
@@ -171,23 +210,31 @@ export const TaskExecutionModal: React.FC<TaskExecutionModalProps> = ({ task, on
               {/* 1. INITIAL UNSTARTED STATE */}
               {!timerRunning && !timerFinished && (
                 <>
-                  <div className="p-3.5 rounded-2xl bg-slate-900/90 border border-rose-500/30 text-xs text-slate-300 space-y-1">
-                    <div className="flex items-center gap-1.5 font-bold text-rose-300">
-                      <Clock className="w-4 h-4 text-rose-400" />
-                      <span>30-Second Task Visit Required</span>
+                  <div className={`p-3.5 rounded-2xl bg-slate-900/90 border text-xs text-slate-300 space-y-1 ${
+                    isAd ? 'border-amber-500/30' : 'border-rose-500/30'
+                  }`}>
+                    <div className={`flex items-center gap-1.5 font-bold ${isAd ? 'text-amber-300' : 'text-rose-300'}`}>
+                      <Clock className={`w-4 h-4 ${isAd ? 'text-amber-400' : 'text-rose-400'}`} />
+                      <span>30-Second {isAd ? 'Ad Visit' : 'Task Visit'} Required</span>
                     </div>
                     <p className="text-[11px] text-slate-400 leading-relaxed">
-                      Please stay on the task page for at least 30 seconds. A 30-second timer will count down before you can claim your reward.
+                      {isAd 
+                        ? 'Please visit the advertisement and stay on the page for at least 30 seconds. A 30-second countdown will track your visit before you can claim your cash reward.'
+                        : 'Please stay on the task page for at least 30 seconds. A 30-second timer will count down before you can claim your reward.'}
                     </p>
                   </div>
 
                   <button
                     onClick={handleStartTask}
                     disabled={isStarting}
-                    className="w-full py-3.5 rounded-xl electric-gradient-btn text-sm font-bold text-white shadow-lg flex items-center justify-center gap-2 group disabled:opacity-50 transition-all hover:scale-[1.02]"
+                    className={`w-full py-3.5 rounded-xl text-sm font-bold text-white shadow-lg flex items-center justify-center gap-2 group disabled:opacity-50 transition-all hover:scale-[1.02] ${
+                      isAd 
+                        ? 'bg-gradient-to-r from-amber-500 to-rose-600 hover:from-amber-400 hover:to-rose-500 glow-amber' 
+                        : 'electric-gradient-btn'
+                    }`}
                   >
                     <Play className="w-4 h-4 fill-white transition-transform group-hover:scale-110" />
-                    <span>{isStarting ? 'Opening Task Link...' : 'Start Task (30 Seconds)'}</span>
+                    <span>{isStarting ? (isAd ? 'Opening Advertisement...' : 'Opening Task Link...') : (isAd ? 'Start Ad (30 Seconds)' : 'Start Task (30 Seconds)')}</span>
                   </button>
                 </>
               )}
@@ -195,10 +242,14 @@ export const TaskExecutionModal: React.FC<TaskExecutionModalProps> = ({ task, on
               {/* 2. ACTIVE 30-SECOND COUNTDOWN TIMER */}
               {timerRunning && (
                 <div className="space-y-3">
-                  <div className="p-4 rounded-2xl bg-rose-950/40 border border-rose-500/40 space-y-3">
-                    <div className="flex items-center justify-between text-xs font-bold text-rose-200">
+                  <div className={`p-4 rounded-2xl space-y-3 ${
+                    isAd ? 'bg-amber-950/40 border border-amber-500/40' : 'bg-rose-950/40 border border-rose-500/40'
+                  }`}>
+                    <div className={`flex items-center justify-between text-xs font-bold ${
+                      isAd ? 'text-amber-200' : 'text-rose-200'
+                    }`}>
                       <span className="flex items-center gap-1.5">
-                        <Clock className="w-4 h-4 text-rose-400 animate-spin" />
+                        <Clock className={`w-4 h-4 animate-spin ${isAd ? 'text-amber-400' : 'text-rose-400'}`} />
                         <span>30s Countdown Running...</span>
                       </span>
                       <span className="text-amber-400 font-mono text-sm">{timeLeft}s remaining</span>
@@ -207,13 +258,19 @@ export const TaskExecutionModal: React.FC<TaskExecutionModalProps> = ({ task, on
                     {/* Progress Bar */}
                     <div className="w-full h-3 rounded-full bg-slate-900 overflow-hidden border border-slate-800">
                       <div
-                        className="h-full bg-gradient-to-r from-red-600 via-rose-500 to-amber-400 transition-all duration-1000 ease-linear"
+                        className={`h-full transition-all duration-1000 ease-linear ${
+                          isAd 
+                            ? 'bg-gradient-to-r from-amber-500 via-orange-500 to-rose-500' 
+                            : 'bg-gradient-to-r from-red-600 via-rose-500 to-amber-400'
+                        }`}
                         style={{ width: `${((30 - timeLeft) / 30) * 100}%` }}
                       ></div>
                     </div>
 
                     <p className="text-[11px] text-slate-400 text-center">
-                      Please stay on the task page for 30 seconds to unlock your cash reward.
+                      {isAd 
+                        ? 'Please stay on the advertisement page for 30 seconds to unlock your cash reward.'
+                        : 'Please stay on the task page for 30 seconds to unlock your cash reward.'}
                     </p>
                   </div>
 

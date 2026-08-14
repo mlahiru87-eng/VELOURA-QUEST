@@ -1,6 +1,6 @@
 {
   "name": "Veloura Quest",
-  "description": "A modern mobile-first reward platform with daily tasks, electric blue & purple glassmorphism UI, referrals, wallet tracking, notifications, and an admin panel.",
+  "description": "A modern mobile-first reward platform with video & ads tasks, real-time live support chat, referrals, wallet tracking, notifications, and an administrative studio.",
   "requestFramePermissions": [],
   "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
 }

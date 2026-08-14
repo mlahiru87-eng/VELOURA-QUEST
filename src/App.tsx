@@ -1,6 +1,7 @@
 import React, { Suspense, lazy } from 'react';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { ToastProvider } from './context/ToastContext';
+import { SupportProvider } from './context/SupportContext';
 import { Navbar } from './components/Navbar';
 import { OnboardingModal } from './components/OnboardingModal';
 import { OfflineBanner } from './components/OfflineBanner';
@@ -22,6 +23,7 @@ const DailyTasksView = lazy(() => import('./views/DailyTasksView').then(m => ({ 
 const WalletView = lazy(() => import('./views/WalletView').then(m => ({ default: m.WalletView })));
 const ReferralView = lazy(() => import('./views/ReferralView').then(m => ({ default: m.ReferralView })));
 const NotificationsView = lazy(() => import('./views/NotificationsView').then(m => ({ default: m.NotificationsView })));
+const SupportChatView = lazy(() => import('./views/SupportChatView').then(m => ({ default: m.SupportChatView })));
 const ProfileView = lazy(() => import('./views/ProfileView').then(m => ({ default: m.ProfileView })));
 const AdminPanelView = lazy(() => import('./views/AdminPanelView').then(m => ({ default: m.AdminPanelView })));
 const QuestCompleteView = lazy(() => import('./views/QuestCompleteView').then(m => ({ default: m.QuestCompleteView })));
@@ -63,6 +65,7 @@ const MainAppContent: React.FC = () => {
             {currentPage === 'tasks' && <DailyTasksView />}
             {currentPage === 'wallet' && <WalletView />}
             {currentPage === 'referral' && <ReferralView />}
+            {currentPage === 'support' && <SupportChatView />}
             {currentPage === 'notifications' && <NotificationsView />}
             {currentPage === 'profile' && <ProfileView />}
             {currentPage === 'admin' && <AdminPanelView />}
@@ -79,7 +82,9 @@ export default function App() {
     <ErrorBoundary>
       <ToastProvider>
         <AuthProvider>
-          <MainAppContent />
+          <SupportProvider>
+            <MainAppContent />
+          </SupportProvider>
         </AuthProvider>
       </ToastProvider>
     </ErrorBoundary>

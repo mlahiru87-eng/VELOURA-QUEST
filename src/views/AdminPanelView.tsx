@@ -1,8 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
+import { useSupport } from '../context/SupportContext';
 import { useToast } from '../context/ToastContext';
 import { TaskItem, UserProfile, SystemSettings, WithdrawalRequest } from '../types';
 import { AnalyticsDashboard } from '../components/AnalyticsDashboard';
+import { AdminSupportPanel } from '../components/AdminSupportPanel';
 import { UserTimelineModal } from '../components/UserTimelineModal';
 import { WalletAdjustmentModal } from '../components/WalletAdjustmentModal';
 import { exportUsersCSV, exportWithdrawalsCSV, exportTransactionsCSV } from '../lib/securityAndUtils';
@@ -34,7 +36,11 @@ import {
   ExternalLink,
   CheckCircle2,
   AlertTriangle,
-  Lock
+  Lock,
+  Megaphone,
+  Film,
+  Link2,
+  MessageSquare
 } from 'lucide-react';
 
 export const AdminPanelView: React.FC = () => {
@@ -57,9 +63,10 @@ export const AdminPanelView: React.FC = () => {
     toggleUserSuspensionStatus
   } = useAuth();
 
+  const { unreadForAdminCount } = useSupport();
   const { showToast } = useToast();
 
-  const [adminTab, setAdminTab] = useState<'analytics' | 'users' | 'tasks' | 'withdrawals' | 'referrals' | 'audit' | 'notifications' | 'settings'>('analytics');
+  const [adminTab, setAdminTab] = useState<'analytics' | 'users' | 'tasks' | 'withdrawals' | 'referrals' | 'support' | 'audit' | 'notifications' | 'settings'>('analytics');
 
   // Search & Filter state for users
   const [userSearch, setUserSearch] = useState('');
@@ -84,8 +91,10 @@ export const AdminPanelView: React.FC = () => {
 
   // New task form state
   const [taskVideoUrl, setTaskVideoUrl] = useState('');
-  const [taskCategory, setTaskCategory] = useState<'Video' | 'Survey' | 'Game Quest' | 'App Install' | 'Special'>('Video');
+  const [taskAdUrl, setTaskAdUrl] = useState('');
+  const [taskCategory, setTaskCategory] = useState<'Video' | 'Ads' | 'Survey' | 'Game Quest' | 'App Install' | 'Special'>('Video');
   const [taskReward, setTaskReward] = useState('5.00');
+  const [adminTaskCategoryFilter, setAdminTaskCategoryFilter] = useState<string>('all');
 
   // Auto-detected metadata state (editable by admin if needed)
   const [taskTitle, setTaskTitle] = useState('');
@@ -322,12 +331,6 @@ export const AdminPanelView: React.FC = () => {
 
   const handleAddTask = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!taskVideoUrl.trim()) {
-      showToast("Error", "Please enter a valid Video URL.", "error");
-      return;
-    }
-
-    const finalTitle = taskTitle.trim() || 'Veloura Daily Quest';
     const finalReward = parseFloat(taskReward);
 
     if (isNaN(finalReward) || finalReward < 0.01) {
@@ -335,29 +338,55 @@ export const AdminPanelView: React.FC = () => {
       return;
     }
 
-    const finalDuration = parseInt(taskDuration) || 30;
-    const finalThumb = taskThumbnail.trim() || 'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?w=500&auto=format&fit=crop&q=80';
+    if (taskCategory === 'Ads') {
+      if (!taskAdUrl.trim()) {
+        showToast("Error", "Please enter a valid Advertisement URL.", "error");
+        return;
+      }
 
-    await addNewTask({
-      title: finalTitle,
-      description: 'Veloura Quest',
-      reward: finalReward,
-      rewardAmount: finalReward,
-      thumbnailUrl: finalThumb,
-      thumbnail: finalThumb,
-      videoUrl: taskVideoUrl.trim(),
-      duration: finalDuration,
-      durationSeconds: finalDuration,
-      category: taskCategory,
-      createdAt: new Date().toISOString(),
-      active: true,
-    });
+      await addNewTask({
+        title: 'Advertisement Task',
+        category: 'Ads',
+        reward: finalReward,
+        adUrl: taskAdUrl.trim(),
+        createdAt: new Date().toISOString(),
+        active: true,
+      });
 
-    showToast("Task Published", `Created quest "${finalTitle}".`, "success");
-    setTaskVideoUrl('');
-    setTaskTitle('');
-    setTaskThumbnail('');
-    setTaskDuration('30');
+      showToast("Task Published", `Created Ad Task with +$${finalReward.toFixed(2)} USDT reward.`, "success");
+      setTaskAdUrl('');
+      setTaskReward('0.01');
+    } else {
+      if (!taskVideoUrl.trim()) {
+        showToast("Error", "Please enter a valid Video URL.", "error");
+        return;
+      }
+
+      const finalTitle = taskTitle.trim() || 'Veloura Daily Quest';
+      const finalDuration = parseInt(taskDuration) || 30;
+      const finalThumb = taskThumbnail.trim() || 'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?w=500&auto=format&fit=crop&q=80';
+
+      await addNewTask({
+        title: finalTitle,
+        description: 'Veloura Quest',
+        reward: finalReward,
+        rewardAmount: finalReward,
+        thumbnailUrl: finalThumb,
+        thumbnail: finalThumb,
+        videoUrl: taskVideoUrl.trim(),
+        duration: finalDuration,
+        durationSeconds: finalDuration,
+        category: taskCategory,
+        createdAt: new Date().toISOString(),
+        active: true,
+      });
+
+      showToast("Task Published", `Created quest "${finalTitle}".`, "success");
+      setTaskVideoUrl('');
+      setTaskTitle('');
+      setTaskThumbnail('');
+      setTaskDuration('30');
+    }
   };
 
   const handleSendNotif = async (e: React.FormEvent) => {
@@ -436,6 +465,7 @@ export const AdminPanelView: React.FC = () => {
           { id: 'users', label: `Users (${allUsers.length})`, icon: <Users className="w-4 h-4" /> },
           { id: 'tasks', label: `Tasks (${tasks.length})`, icon: <CheckSquare className="w-4 h-4" /> },
           { id: 'withdrawals', label: `Cashouts (${allWithdrawals.filter(w=>w.status==='pending').length} pending)`, icon: <Wallet className="w-4 h-4" /> },
+          { id: 'support', label: `Support Chat${unreadForAdminCount > 0 ? ` (${unreadForAdminCount} new)` : ''}`, icon: <MessageSquare className="w-4 h-4" /> },
           { id: 'referrals', label: 'Referral Commissions', icon: <DollarSign className="w-4 h-4" /> },
           { id: 'audit', label: `Audit Logs (${auditLogs.length})`, icon: <FileText className="w-4 h-4" /> },
           { id: 'notifications', label: 'Announcements', icon: <Bell className="w-4 h-4" /> },
@@ -458,6 +488,9 @@ export const AdminPanelView: React.FC = () => {
 
       {/* Analytics Tab */}
       {adminTab === 'analytics' && <AnalyticsDashboard />}
+
+      {/* Support Chat Tab */}
+      {adminTab === 'support' && <AdminSupportPanel />}
 
       {/* Users Tab */}
       {adminTab === 'users' && (
@@ -622,180 +655,381 @@ export const AdminPanelView: React.FC = () => {
         <div className="space-y-6">
           {/* Add New Task Form */}
           <div className="glass-panel p-6 sm:p-8 rounded-3xl border border-slate-800 space-y-6">
-            <div>
-              <h3 className="text-sm font-bold text-slate-100 flex items-center gap-2">
-                <Plus className="w-4 h-4 text-purple-400" /> Create New Daily Quest
-              </h3>
-              <p className="text-xs text-slate-400 mt-1">
-                Provide the video URL, category, and reward. Title, thumbnail, and duration will be auto-detected.
-              </p>
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+              <div>
+                <h3 className="text-sm font-bold text-slate-100 flex items-center gap-2">
+                  <Plus className="w-4 h-4 text-purple-400" /> Create New Task
+                </h3>
+                <p className="text-xs text-slate-400 mt-1">
+                  Select a category to create either an interactive Video Quest or an external Ad Task.
+                </p>
+              </div>
+
+              {/* Task Type Switcher */}
+              <div className="flex items-center bg-slate-900/90 p-1 rounded-xl border border-slate-800 shrink-0">
+                <button
+                  type="button"
+                  onClick={() => setTaskCategory('Video')}
+                  className={`px-3.5 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 ${
+                    taskCategory !== 'Ads'
+                      ? 'bg-purple-600 text-white shadow-md'
+                      : 'text-slate-400 hover:text-slate-200'
+                  }`}
+                >
+                  <Film className="w-3.5 h-3.5" /> Video Task
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setTaskCategory('Ads');
+                    if (taskReward === '5.00') setTaskReward('0.01');
+                  }}
+                  className={`px-3.5 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 ${
+                    taskCategory === 'Ads'
+                      ? 'bg-amber-500 text-slate-950 font-black shadow-md'
+                      : 'text-slate-400 hover:text-slate-200'
+                  }`}
+                >
+                  <Megaphone className="w-3.5 h-3.5" /> Ad Task
+                </button>
+              </div>
             </div>
 
             <form onSubmit={handleAddTask} className="space-y-6">
-              <div className="space-y-4">
-                {/* 1. Video URL */}
-                <div>
-                  <label className="block text-[11px] font-bold uppercase tracking-wider text-slate-400 mb-1.5">
-                    Video URL *
-                  </label>
-                  <input
-                    type="url"
-                    required
-                    placeholder="https://veloura-etez.vercel.app/video/Lwq20xe9n2eLnBbQqzjC"
-                    value={taskVideoUrl}
-                    onChange={(e) => setTaskVideoUrl(e.target.value)}
-                    className="w-full glass-input rounded-xl px-4 py-3 text-xs text-slate-100 font-mono focus:border-purple-500 transition-colors"
-                  />
-                </div>
-
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  {/* 2. Category */}
-                  <div>
-                    <label className="block text-[11px] font-bold uppercase tracking-wider text-slate-400 mb-1.5">
-                      Category ▼
-                    </label>
-                    <select
-                      value={taskCategory}
-                      onChange={(e) => setTaskCategory(e.target.value as any)}
-                      className="w-full glass-input rounded-xl px-4 py-3 text-xs text-slate-100 bg-slate-900/90 border-slate-800 focus:border-purple-500 transition-colors cursor-pointer"
-                    >
-                      <option value="Video">Video</option>
-                      <option value="Survey">Survey</option>
-                      <option value="Game Quest">Game Quest</option>
-                      <option value="App Install">App Install</option>
-                      <option value="Special">Special</option>
-                    </select>
+              {taskCategory === 'Ads' ? (
+                /* Simplified Ad Task Creation Form */
+                <div className="space-y-4">
+                  <div className="p-4 rounded-2xl bg-amber-500/10 border border-amber-500/20 text-xs text-amber-300 flex items-start gap-2">
+                    <Megaphone className="w-4 h-4 shrink-0 mt-0.5 text-amber-400" />
+                    <div>
+                      <span className="font-bold">Simplified Ad Task:</span> Users will visit your advertisement link and must remain on the page for 30 seconds to earn the reward.
+                    </div>
                   </div>
 
-                  {/* 3. Reward */}
-                  <div>
-                    <label className="block text-[11px] font-bold uppercase tracking-wider text-slate-400 mb-1.5">
-                      Reward ($) *
-                    </label>
-                    <input
-                      type="number"
-                      step="0.01"
-                      min="0.01"
-                      required
-                      value={taskReward}
-                      onChange={(e) => setTaskReward(e.target.value)}
-                      className="w-full glass-input rounded-xl px-4 py-3 text-xs text-slate-100 font-mono font-bold focus:border-purple-500 transition-colors"
-                    />
-                    {taskReward !== '' && parseFloat(taskReward) < 0.01 && (
-                      <p className="text-[10px] text-rose-400 mt-1">Minimum task reward is 0.01 USDT.</p>
-                    )}
-                  </div>
-                </div>
-              </div>
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    {/* 1. Ad URL */}
+                    <div className="md:col-span-2">
+                      <label className="block text-[11px] font-bold uppercase tracking-wider text-slate-400 mb-1.5 flex items-center gap-1">
+                        <Link2 className="w-3.5 h-3.5 text-amber-400" /> Ad URL *
+                      </label>
+                      <input
+                        type="url"
+                        required
+                        placeholder="https://example.com/advertisement"
+                        value={taskAdUrl}
+                        onChange={(e) => setTaskAdUrl(e.target.value)}
+                        className="w-full glass-input rounded-xl px-4 py-3 text-xs text-slate-100 font-mono focus:border-amber-500 transition-colors"
+                      />
+                    </div>
 
-              {/* Video Preview Section */}
-              {taskVideoUrl.trim() && (
-                <div className="p-5 rounded-2xl bg-slate-900/90 border border-purple-500/30 space-y-4 transition-all">
-                  <div className="flex items-center justify-between">
-                    <span className="text-xs font-bold text-purple-300 flex items-center gap-1.5">
-                      <Sparkles className="w-4 h-4 text-purple-400" /> Video Preview
-                    </span>
-                    {isDetecting ? (
-                      <span className="text-[10px] text-amber-400 animate-pulse font-mono font-bold">
-                        Auto-detecting video metadata...
-                      </span>
-                    ) : (
-                      <span className="text-[10px] text-emerald-400 font-mono font-bold">
-                        ✓ Auto-detected
-                      </span>
-                    )}
-                  </div>
-
-                  <div className="flex flex-col md:flex-row gap-5 items-start">
-                    {/* Thumbnail */}
-                    <div className="w-full md:w-48 h-28 rounded-xl overflow-hidden bg-slate-950 border border-slate-700 shrink-0 relative shadow-md">
-                      {taskThumbnail ? (
-                        <img src={taskThumbnail} alt="Thumbnail Preview" className="w-full h-full object-cover" />
-                      ) : (
-                        <div className="w-full h-full flex items-center justify-center text-slate-600 text-xs">Thumbnail: Auto detecting...</div>
+                    {/* 2. Reward Amount */}
+                    <div>
+                      <label className="block text-[11px] font-bold uppercase tracking-wider text-slate-400 mb-1.5 flex items-center gap-1">
+                        <DollarSign className="w-3.5 h-3.5 text-emerald-400" /> Reward Amount (USDT) *
+                      </label>
+                      <input
+                        type="number"
+                        step="0.01"
+                        min="0.01"
+                        required
+                        value={taskReward}
+                        onChange={(e) => setTaskReward(e.target.value)}
+                        placeholder="0.01"
+                        className="w-full glass-input rounded-xl px-4 py-3 text-xs text-slate-100 font-mono font-bold focus:border-amber-500 transition-colors"
+                      />
+                      {taskReward !== '' && parseFloat(taskReward) < 0.01 && (
+                        <p className="text-[10px] text-rose-400 mt-1">Minimum task reward is 0.01 USDT.</p>
                       )}
                     </div>
+                  </div>
 
-                    {/* Auto Detected Fields */}
-                    <div className="flex-1 space-y-3 w-full">
+                  {/* AD TASK PREVIEW */}
+                  <div className="p-5 rounded-2xl bg-slate-900/90 border border-amber-500/30 space-y-3 transition-all">
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs font-bold text-amber-300 flex items-center gap-1.5">
+                        <Megaphone className="w-4 h-4 text-amber-400" /> 📢 Ad Task
+                      </span>
+                      <span className="text-[10px] font-bold uppercase text-amber-300 bg-amber-500/20 px-2.5 py-0.5 rounded-full border border-amber-500/30">
+                        Category: Ads
+                      </span>
+                    </div>
+
+                    <div className="space-y-3 bg-slate-950/60 p-4 rounded-xl border border-slate-800">
                       <div>
-                        <label className="block text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1">
-                          Title (Auto detected - editable)
-                        </label>
-                        <input
-                          type="text"
-                          value={taskTitle}
-                          onChange={(e) => setTaskTitle(e.target.value)}
-                          placeholder="Auto detecting title..."
-                          className="w-full glass-input rounded-xl px-3.5 py-2 text-xs font-bold text-slate-100 border border-slate-700/80 focus:border-purple-500"
-                        />
-                      </div>
-
-                      <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 text-[10px]">
-                        <div className="p-2 rounded-lg bg-slate-950/60 border border-slate-800">
-                          <span className="text-slate-500 block uppercase font-bold text-[9px]">Thumbnail</span>
-                          <span className="text-slate-300 font-mono font-medium truncate block">Auto detected</span>
-                        </div>
-                        <div className="p-2 rounded-lg bg-slate-950/60 border border-slate-800">
-                          <span className="text-slate-500 block uppercase font-bold text-[9px]">Duration</span>
-                          <span className="text-blue-400 font-mono font-bold block">{taskDuration} Seconds</span>
-                        </div>
-                        <div className="p-2 rounded-lg bg-slate-950/60 border border-slate-800 col-span-2 sm:col-span-1">
-                          <span className="text-slate-500 block uppercase font-bold text-[9px]">Reward</span>
-                          <span className="text-emerald-400 font-mono font-bold block">+${(parseFloat(taskReward) || 0).toFixed(2)} USDT</span>
+                        <span className="text-[10px] font-bold uppercase text-slate-400 block mb-1">
+                          🔗 Advertisement Link
+                        </span>
+                        <div className="text-xs font-mono text-amber-200/90 bg-slate-900 px-3 py-2 rounded-lg border border-slate-800 truncate">
+                          {taskAdUrl.trim() || 'https://example.com/advertisement'}
                         </div>
                       </div>
 
-                      <div className="text-[10px] font-mono text-slate-400 truncate">
-                        <span className="text-slate-500 font-bold uppercase">Target: </span>
-                        {taskVideoUrl}
+                      <div className="flex items-center justify-between pt-2 border-t border-slate-800/80">
+                        <div>
+                          <span className="text-[10px] font-bold uppercase text-slate-400 block">
+                            💰 Reward
+                          </span>
+                          <span className="text-sm font-extrabold text-emerald-400">
+                            +${(parseFloat(taskReward) || 0.01).toFixed(2)} USDT
+                          </span>
+                        </div>
+                        <div className="text-right">
+                          <span className="text-[10px] font-bold uppercase text-slate-400 block">
+                            ⏱ Stay Requirement
+                          </span>
+                          <span className="text-xs font-bold text-blue-400">
+                            30 Seconds
+                          </span>
+                        </div>
                       </div>
                     </div>
+                  </div>
+
+                  {/* Publish Ad Task Button */}
+                  <div className="flex justify-end pt-2">
+                    <button
+                      type="submit"
+                      disabled={!taskAdUrl.trim() || isNaN(parseFloat(taskReward)) || parseFloat(taskReward) < 0.01}
+                      className="w-full sm:w-auto px-8 py-3.5 rounded-xl bg-gradient-to-r from-amber-500 to-orange-500 text-slate-950 text-xs font-black shadow-lg shadow-amber-500/20 inline-flex items-center justify-center gap-2 hover:scale-[1.02] transition-transform disabled:opacity-50"
+                    >
+                      <Plus className="w-4 h-4" /> Publish Ad Task
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                /* Video Task Creation Form */
+                <div className="space-y-4">
+                  {/* 1. Video URL */}
+                  <div>
+                    <label className="block text-[11px] font-bold uppercase tracking-wider text-slate-400 mb-1.5 flex items-center gap-1">
+                      <Film className="w-3.5 h-3.5 text-purple-400" /> Video URL *
+                    </label>
+                    <input
+                      type="url"
+                      required
+                      placeholder="https://veloura-etez.vercel.app/video/Lwq20xe9n2eLnBbQqzjC"
+                      value={taskVideoUrl}
+                      onChange={(e) => setTaskVideoUrl(e.target.value)}
+                      className="w-full glass-input rounded-xl px-4 py-3 text-xs text-slate-100 font-mono focus:border-purple-500 transition-colors"
+                    />
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    {/* 2. Category */}
+                    <div>
+                      <label className="block text-[11px] font-bold uppercase tracking-wider text-slate-400 mb-1.5">
+                        Category ▼
+                      </label>
+                      <select
+                        value={taskCategory}
+                        onChange={(e) => setTaskCategory(e.target.value as any)}
+                        className="w-full glass-input rounded-xl px-4 py-3 text-xs text-slate-100 bg-slate-900/90 border-slate-800 focus:border-purple-500 transition-colors cursor-pointer"
+                      >
+                        <option value="Video">Video</option>
+                        <option value="Survey">Survey</option>
+                        <option value="Game Quest">Game Quest</option>
+                        <option value="App Install">App Install</option>
+                        <option value="Special">Special</option>
+                      </select>
+                    </div>
+
+                    {/* 3. Reward */}
+                    <div>
+                      <label className="block text-[11px] font-bold uppercase tracking-wider text-slate-400 mb-1.5">
+                        Reward ($) *
+                      </label>
+                      <input
+                        type="number"
+                        step="0.01"
+                        min="0.01"
+                        required
+                        value={taskReward}
+                        onChange={(e) => setTaskReward(e.target.value)}
+                        className="w-full glass-input rounded-xl px-4 py-3 text-xs text-slate-100 font-mono font-bold focus:border-purple-500 transition-colors"
+                      />
+                      {taskReward !== '' && parseFloat(taskReward) < 0.01 && (
+                        <p className="text-[10px] text-rose-400 mt-1">Minimum task reward is 0.01 USDT.</p>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Video Preview Section */}
+                  {taskVideoUrl.trim() && (
+                    <div className="p-5 rounded-2xl bg-slate-900/90 border border-purple-500/30 space-y-4 transition-all">
+                      <div className="flex items-center justify-between">
+                        <span className="text-xs font-bold text-purple-300 flex items-center gap-1.5">
+                          <Sparkles className="w-4 h-4 text-purple-400" /> Video Preview
+                        </span>
+                        {isDetecting ? (
+                          <span className="text-[10px] text-amber-400 animate-pulse font-mono font-bold">
+                            Auto-detecting video metadata...
+                          </span>
+                        ) : (
+                          <span className="text-[10px] text-emerald-400 font-mono font-bold">
+                            ✓ Auto-detected
+                          </span>
+                        )}
+                      </div>
+
+                      <div className="flex flex-col md:flex-row gap-5 items-start">
+                        {/* Thumbnail */}
+                        <div className="w-full md:w-48 h-28 rounded-xl overflow-hidden bg-slate-950 border border-slate-700 shrink-0 relative shadow-md">
+                          {taskThumbnail ? (
+                            <img src={taskThumbnail} alt="Thumbnail Preview" className="w-full h-full object-cover" />
+                          ) : (
+                            <div className="w-full h-full flex items-center justify-center text-slate-600 text-xs">Thumbnail: Auto detecting...</div>
+                          )}
+                        </div>
+
+                        {/* Auto Detected Fields */}
+                        <div className="flex-1 space-y-3 w-full">
+                          <div>
+                            <label className="block text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1">
+                              Title (Auto detected - editable)
+                            </label>
+                            <input
+                              type="text"
+                              value={taskTitle}
+                              onChange={(e) => setTaskTitle(e.target.value)}
+                              placeholder="Auto detecting title..."
+                              className="w-full glass-input rounded-xl px-3.5 py-2 text-xs font-bold text-slate-100 border border-slate-700/80 focus:border-purple-500"
+                            />
+                          </div>
+
+                          <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 text-[10px]">
+                            <div className="p-2 rounded-lg bg-slate-950/60 border border-slate-800">
+                              <span className="text-slate-500 block uppercase font-bold text-[9px]">Thumbnail</span>
+                              <span className="text-slate-300 font-mono font-medium truncate block">Auto detected</span>
+                            </div>
+                            <div className="p-2 rounded-lg bg-slate-950/60 border border-slate-800">
+                              <span className="text-slate-500 block uppercase font-bold text-[9px]">Duration</span>
+                              <span className="text-blue-400 font-mono font-bold block">{taskDuration} Seconds</span>
+                            </div>
+                            <div className="p-2 rounded-lg bg-slate-950/60 border border-slate-800 col-span-2 sm:col-span-1">
+                              <span className="text-slate-500 block uppercase font-bold text-[9px]">Reward</span>
+                              <span className="text-emerald-400 font-mono font-bold block">+${(parseFloat(taskReward) || 0).toFixed(2)} USDT</span>
+                            </div>
+                          </div>
+
+                          <div className="text-[10px] font-mono text-slate-400 truncate">
+                            <span className="text-slate-500 font-bold uppercase">Target: </span>
+                            {taskVideoUrl}
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Publish Task Button */}
+                  <div className="flex justify-end pt-2">
+                    <button
+                      type="submit"
+                      disabled={isDetecting || !taskVideoUrl.trim() || isNaN(parseFloat(taskReward)) || parseFloat(taskReward) < 0.01}
+                      className="w-full sm:w-auto px-8 py-3.5 rounded-xl electric-gradient-btn text-xs font-bold text-white shadow-lg inline-flex items-center justify-center gap-2 hover:scale-[1.02] transition-transform disabled:opacity-50"
+                    >
+                      <Plus className="w-4 h-4" /> Publish Task
+                    </button>
                   </div>
                 </div>
               )}
-
-              {/* Publish Task Button */}
-              <div className="flex justify-end pt-2">
-                <button
-                  type="submit"
-                  disabled={isDetecting || !taskVideoUrl.trim()}
-                  className="w-full sm:w-auto px-8 py-3.5 rounded-xl electric-gradient-btn text-xs font-bold text-white shadow-lg inline-flex items-center justify-center gap-2 hover:scale-[1.02] transition-transform disabled:opacity-50"
-                >
-                  <Plus className="w-4 h-4" /> Publish Task
-                </button>
-              </div>
             </form>
           </div>
 
           {/* Existing Tasks List */}
           <div className="glass-panel p-6 rounded-3xl border border-slate-800 space-y-4">
-            <h3 className="text-sm font-bold text-slate-100">Active Quest Catalog</h3>
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-              {tasks.map((t) => (
-                <div key={t.id} className="p-4 rounded-2xl bg-slate-900/60 border border-slate-800 space-y-3 flex flex-col justify-between">
-                  <div className="flex space-x-3 min-w-0">
-                    <img src={t.thumbnail} alt={t.title} className="w-14 h-14 rounded-xl object-cover shrink-0 border border-slate-700" />
-                    <div className="min-w-0 flex-1">
-                      <span className="text-[9px] font-bold uppercase text-purple-300 bg-purple-500/20 px-2 py-0.5 rounded border border-purple-500/30">
-                        {t.category}
-                      </span>
-                      <h4 className="text-xs font-bold text-slate-200 mt-1 line-clamp-2">{t.title}</h4>
-                    </div>
-                  </div>
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+              <h3 className="text-sm font-bold text-slate-100 flex items-center gap-2">
+                <CheckSquare className="w-4 h-4 text-purple-400" /> Active Quest Catalog ({tasks.length})
+              </h3>
 
-                  <div className="flex items-center justify-between pt-2 border-t border-slate-800">
-                    <span className="text-xs font-black text-emerald-400">${t.rewardAmount.toFixed(2)}</span>
-                    <button
-                      onClick={() => deleteTaskItem(t.id)}
-                      className="p-1.5 rounded-lg bg-rose-500/20 text-rose-300 hover:bg-rose-500/30 transition-colors"
-                      title="Deactivate Quest"
-                    >
-                      <Trash2 className="w-3.5 h-3.5" />
-                    </button>
-                  </div>
-                </div>
-              ))}
+              {/* Category Filter */}
+              <div className="flex flex-wrap gap-1.5 bg-slate-900/80 p-1 rounded-xl border border-slate-800">
+                <button
+                  type="button"
+                  onClick={() => setAdminTaskCategoryFilter('all')}
+                  className={`px-3 py-1 rounded-lg text-xs font-bold transition-all ${
+                    adminTaskCategoryFilter === 'all'
+                      ? 'bg-purple-600 text-white'
+                      : 'text-slate-400 hover:text-slate-200'
+                  }`}
+                >
+                  All ({tasks.length})
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setAdminTaskCategoryFilter('Video')}
+                  className={`px-3 py-1 rounded-lg text-xs font-bold transition-all flex items-center gap-1 ${
+                    adminTaskCategoryFilter === 'Video'
+                      ? 'bg-purple-600 text-white'
+                      : 'text-slate-400 hover:text-slate-200'
+                  }`}
+                >
+                  <Film className="w-3 h-3" /> Video ({tasks.filter(t => t.category === 'Video').length})
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setAdminTaskCategoryFilter('Ads')}
+                  className={`px-3 py-1 rounded-lg text-xs font-bold transition-all flex items-center gap-1 ${
+                    adminTaskCategoryFilter === 'Ads'
+                      ? 'bg-amber-500 text-slate-950 font-black'
+                      : 'text-slate-400 hover:text-slate-200'
+                  }`}
+                >
+                  <Megaphone className="w-3 h-3" /> Ads ({tasks.filter(t => t.category === 'Ads').length})
+                </button>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              {tasks
+                .filter(t => adminTaskCategoryFilter === 'all' || t.category === adminTaskCategoryFilter)
+                .map((t) => {
+                  const isAd = t.category === 'Ads';
+                  return (
+                    <div key={t.id} className={`p-4 rounded-2xl bg-slate-900/60 border space-y-3 flex flex-col justify-between transition-all ${
+                      isAd ? 'border-amber-500/30 hover:border-amber-500/60' : 'border-slate-800 hover:border-purple-500/40'
+                    }`}>
+                      <div className="flex space-x-3 min-w-0">
+                        {isAd ? (
+                          <div className="w-14 h-14 rounded-xl bg-amber-500/20 border border-amber-500/30 flex items-center justify-center text-amber-400 shrink-0">
+                            <Megaphone className="w-7 h-7" />
+                          </div>
+                        ) : (
+                          <img src={t.thumbnail} alt={t.title} className="w-14 h-14 rounded-xl object-cover shrink-0 border border-slate-700" />
+                        )}
+                        <div className="min-w-0 flex-1">
+                          {isAd ? (
+                            <span className="text-[9px] font-black uppercase text-amber-300 bg-amber-500/20 px-2 py-0.5 rounded border border-amber-500/30 inline-flex items-center gap-1">
+                              <Megaphone className="w-2.5 h-2.5" /> 📢 Ads
+                            </span>
+                          ) : (
+                            <span className="text-[9px] font-bold uppercase text-purple-300 bg-purple-500/20 px-2 py-0.5 rounded border border-purple-500/30 inline-flex items-center gap-1">
+                              <Film className="w-2.5 h-2.5" /> 🎬 Video
+                            </span>
+                          )}
+                          <h4 className="text-xs font-bold text-slate-200 mt-1 line-clamp-1">{t.title}</h4>
+                          <p className="text-[10px] text-slate-400 truncate mt-0.5 font-mono">
+                            {isAd ? (t.adUrl || 'External Link') : (t.videoUrl || 'Video Link')}
+                          </p>
+                        </div>
+                      </div>
+
+                      <div className="flex items-center justify-between pt-2 border-t border-slate-800">
+                        <div className="flex items-center gap-2">
+                          <span className="text-xs font-black text-emerald-400">${(t.rewardAmount || t.reward || 0).toFixed(2)}</span>
+                          <span className="text-[10px] text-slate-500 font-mono">30s</span>
+                        </div>
+                        <button
+                          onClick={() => deleteTaskItem(t.id)}
+                          className="p-1.5 rounded-lg bg-rose-500/20 text-rose-300 hover:bg-rose-500/30 transition-colors"
+                          title="Deactivate Quest"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
+                    </div>
+                  );
+                })}
             </div>
           </div>
         </div>

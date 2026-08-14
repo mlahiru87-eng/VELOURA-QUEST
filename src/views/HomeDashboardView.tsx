@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { useAuth, isTaskCompletedToday } from '../context/AuthContext';
+import { useSupport } from '../context/SupportContext';
 import { TaskItem } from '../types';
 import { TaskExecutionModal } from '../components/TaskExecutionModal';
 import { 
@@ -20,11 +21,17 @@ import {
   Lock,
   ShieldCheck,
   Megaphone,
-  Film
+  Film,
+  MessageSquare,
+  Headphones,
+  Send,
+  HelpCircle,
+  ArrowRight
 } from 'lucide-react';
 
 export const HomeDashboardView: React.FC = () => {
   const { userProfile, tasks, taskCompletions, referrals, setCurrentPage } = useAuth();
+  const { unreadForUserCount, activeUserChat, userMessages } = useSupport();
   const [selectedTask, setSelectedTask] = useState<TaskItem | null>(null);
   const [copiedLink, setCopiedLink] = useState<boolean>(false);
 
@@ -277,6 +284,97 @@ export const HomeDashboardView: React.FC = () => {
           })}
         </div>
       </div>
+
+      {/* 24/7 Live Support Chat Showcase Banner with Chat Image */}
+      <div className="glass-panel p-6 sm:p-7 rounded-3xl border border-rose-500/30 relative overflow-hidden shadow-2xl bg-gradient-to-br from-slate-900/90 via-slate-950/90 to-purple-950/30">
+        <div className="absolute top-0 right-0 w-72 h-72 bg-rose-600/15 rounded-full blur-3xl pointer-events-none"></div>
+        <div className="absolute bottom-0 left-0 w-72 h-72 bg-purple-600/15 rounded-full blur-3xl pointer-events-none"></div>
+
+        <div className="relative z-10 flex flex-col md:flex-row items-start md:items-center justify-between gap-6">
+          {/* Support Agent Image & Status */}
+          <div className="flex items-center space-x-4">
+            <div className="relative shrink-0">
+              <div className="relative w-16 h-16 sm:w-20 sm:h-20 rounded-2xl overflow-hidden border-2 border-rose-500/50 shadow-xl glow-red">
+                <img
+                  src="https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?w=300&auto=format&fit=crop&q=80"
+                  alt="Veloura Support Agent"
+                  className="w-full h-full object-cover"
+                />
+              </div>
+              {/* Online Pulse Badge */}
+              <span className="absolute -bottom-1 -right-1 flex h-4 w-4">
+                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                <span className="relative inline-flex rounded-full h-4 w-4 bg-emerald-500 ring-2 ring-slate-950"></span>
+              </span>
+            </div>
+
+            <div className="space-y-1">
+              <div className="flex flex-wrap items-center gap-2">
+                <span className="px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider bg-rose-500/20 text-rose-300 border border-rose-500/40 flex items-center gap-1">
+                  <Headphones className="w-3 h-3 text-rose-400" /> 24/7 Official Support
+                </span>
+                <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 flex items-center gap-1">
+                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span> Specialists Online
+                </span>
+                {unreadForUserCount > 0 && (
+                  <span className="px-2 py-0.5 rounded-full text-[10px] font-black bg-rose-600 text-white animate-bounce">
+                    {unreadForUserCount} New Reply
+                  </span>
+                )}
+              </div>
+
+              <h3 className="text-lg sm:text-xl font-black text-slate-100 flex items-center gap-1.5">
+                <span>💬 Need Assistance with Quests or Cashouts?</span>
+              </h3>
+              <p className="text-xs text-slate-400 max-w-lg leading-relaxed">
+                Connect directly with our support team. Inquire about daily 18+ tasks, USDT TRC-20 withdrawals, referral bonuses, or account queries with instant real-time replies.
+              </p>
+            </div>
+          </div>
+
+          {/* Quick CTA Actions */}
+          <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2.5 w-full md:w-auto shrink-0">
+            <button
+              onClick={() => setCurrentPage('support')}
+              className="px-5 py-3 rounded-2xl electric-gradient-btn text-xs sm:text-sm font-bold text-white shadow-xl flex items-center justify-center gap-2 hover:scale-105 active:scale-95 transition-all glow-red"
+            >
+              <MessageSquare className="w-4 h-4" />
+              <span>{unreadForUserCount > 0 ? `Open Support (${unreadForUserCount} Unread)` : 'Chat With Support'}</span>
+              <ArrowRight className="w-3.5 h-3.5" />
+            </button>
+          </div>
+        </div>
+      </div>
+
+      {/* Floating Support Chat Button (Quick Access with Chat Avatar) */}
+      <button
+        onClick={() => setCurrentPage('support')}
+        className="fixed bottom-20 md:bottom-8 right-4 sm:right-6 z-40 group flex items-center gap-2.5 p-1.5 sm:p-2 pr-3 sm:pr-4 rounded-full bg-slate-950/90 border border-rose-500/50 hover:border-rose-400 shadow-2xl backdrop-blur-xl transition-all duration-300 hover:scale-105 glow-red"
+        title="Open Support Chat"
+      >
+        <div className="relative">
+          <div className="w-10 h-10 sm:w-11 sm:h-11 rounded-full overflow-hidden border-2 border-rose-500/60 shrink-0">
+            <img
+              src="https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?w=150&auto=format&fit=crop&q=80"
+              alt="Live Chat Agent"
+              className="w-full h-full object-cover"
+            />
+          </div>
+          <span className="absolute bottom-0 right-0 w-3 h-3 rounded-full bg-emerald-500 ring-2 ring-slate-950"></span>
+          {unreadForUserCount > 0 && (
+            <span className="absolute -top-1 -right-1 w-5 h-5 rounded-full bg-rose-600 text-white text-[10px] font-black flex items-center justify-center ring-2 ring-slate-950 animate-bounce">
+              {unreadForUserCount}
+            </span>
+          )}
+        </div>
+        <div className="text-left hidden xs:block sm:block">
+          <div className="text-[11px] font-bold text-slate-100 flex items-center gap-1">
+            <span>Live Chat</span>
+            <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
+          </div>
+          <p className="text-[9px] text-rose-300 font-semibold">Online Support</p>
+        </div>
+      </button>
 
       {/* Referral Summary Banner */}
       <div className="glass-panel p-6 rounded-3xl border border-purple-500/30 relative overflow-hidden flex flex-col md:flex-row items-center justify-between gap-6">
